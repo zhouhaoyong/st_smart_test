@@ -76,7 +76,7 @@ test('详情信息页使用接口返回的时间，并在缺少修改时间时�
 test('AI 保存接口和用例时使用实际保存人作为创建人', () => {
   const persistSource = read('../../backend/services/ai_import/persist.py')
 
-  assert.match(persistSource, /def _new_test_case\([\s\S]*created_by: int\)/)
+  assert.match(persistSource, /def _new_test_case\([\s\S]*created_by: int,\s*save_time/)
   assert.match(persistSource, /created_by=created_by,\s*\n\s*updated_by=created_by/)
   assert.match(persistSource, /db\.add\(_new_test_case\([\s\S]*current_user\.real_name,\s*\n\s*current_user\.id/)
   assert.doesNotMatch(persistSource, /def _new_interface\(/, '当前 AI 保存流程只向既有接口追加用例，不应重新创建接口')

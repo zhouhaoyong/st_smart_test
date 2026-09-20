@@ -19,7 +19,7 @@ const interfaceListTemplate = interfacesTemplate.slice(
 
 test('固定高度页面只让接口管理和用例内容区承担滚动', () => {
   assert.match(layoutSource, /'fixed-content-page':\s*isFixedContentPage/)
-  assert.match(layoutSource, /const isFixedContentPage = computed\(\(\) => \['Environments', 'Interfaces', 'InterfaceCases'\]\.includes\(route\.name\)\)/)
+  assert.match(layoutSource, /const isFixedContentPage = computed\(\(\) => \['Environments', 'Interfaces', 'InterfaceCases', 'ParameterSetDetail'\]\.includes\(route\.name\)\)/)
   assert.match(layoutSource, /\.main\.fixed-content-page\s*\{[\s\S]*?overflow:\s*hidden;/)
   assert.match(interfaceCasesSource, /\.cases-main\s*\{[\s\S]*?overflow:\s*hidden;/)
   assert.match(interfaceCasesSource, /\.cases-sidebar\s*\{[\s\S]*?border:\s*1px\s+solid/)
@@ -34,8 +34,8 @@ test('接口管理页的目录树和表格在卡片内部滚动', () => {
   assert.match(interfacesSource, /\.tree-card\s*\{[\s\S]*?overflow:\s*hidden;/)
   assert.match(interfacesSource, /\.interfaces-container :deep\(\.el-col\)\s*\{[\s\S]*?height:\s*100%;/)
   assert.match(interfacesSource, /\.collection-tree\s*\{[\s\S]*?flex:\s*1[\s\S]*?overflow-y:\s*auto;/)
-  assert.match(interfacesTemplate, /<div class="interface-table-scroll">\s*<el-table/)
-  assert.match(interfacesTemplate, /<\/el-table>\s*<\/div>\s*<el-pagination/)
+  assert.match(interfacesTemplate, /<div class="interface-table-scroll"[^>]*>\s*<el-table v-if="interfaceList\.length"/)
+  assert.match(interfacesTemplate, /<\/el-table>\s*<GlobalEmpty v-else-if="!loading" \/>[\s\S]*<\/div>\s*<el-pagination/)
   assert.match(interfacesSource, /\.interface-table-scroll\s*\{[\s\S]*?flex:\s*1[\s\S]*?min-height:\s*0[\s\S]*?overflow:\s*auto;/)
   assert.match(interfacesSource, /\.interface-table-scroll\s*\{[\s\S]*?scrollbar-color:/)
   assert.match(interfacesSource, /\.collection-tree::\-webkit-scrollbar,\s*\.interface-table-scroll::\-webkit-scrollbar\s*\{[\s\S]*?width:/)
@@ -43,7 +43,7 @@ test('接口管理页的目录树和表格在卡片内部滚动', () => {
   assert.match(interfacesSource, /const handleViewAll[\s\S]*?treeRef\.value\.setCurrentKey\(null\)/)
   assert.doesNotMatch(interfaceTreeTemplate, /<el-tooltip/)
   assert.doesNotMatch(interfacesVisibleTemplate, /<el-tooltip/)
-  assert.doesNotMatch(interfaceListTemplate, /show-overflow-tooltip/)
+  assert.match(interfaceListTemplate, /show-overflow-tooltip/)
 })
 
 test('用例管理页的左右区域独立滚动，标题不随卡片列表滚动', () => {

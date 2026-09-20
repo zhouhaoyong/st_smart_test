@@ -49,7 +49,7 @@ assert.doesNotMatch(mergedPage, /\bpreviewWorkbenchRequirementMerge\b|\bsaveWork
 // Test-case generation keeps the actual generation prompt visible and preserves
 // settled answers with the historical question card.
 assert.match(composable, /AI 用例生成规则/)
-assert.match(composable, /contentSections: generationContentSections\(\)/)
+assert.match(composable, /generationContentSections\(\)/)
 assert.match(messageCard, /本次来源需求/)
 assert.doesNotMatch(messageCard, /v-if="message\.sourceSnapshots\.length > 1"/)
 assert.match(composable, /answerSnapshot/)

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const layoutSource = readFileSync(new URL('../src/layout/ToolsLayout.vue', import.meta.url), 'utf8')
+const appLayoutSource = readFileSync(new URL('../src/layout/index.vue', import.meta.url), 'utf8')
 const routerSource = readFileSync(new URL('../src/router/index.js', import.meta.url), 'utf8')
 const topBarSource = readFileSync(new URL('../src/layout/TopBar.vue', import.meta.url), 'utf8')
 const generateSource = readFileSync(new URL('../src/views/tools/GenerateTools.vue', import.meta.url), 'utf8')
@@ -29,13 +30,15 @@ test('文本处理和生成工具按指定顺序展示', () => {
     { path: '/tools/qrcode', label: '二维码生成' },
     { path: '/tools/timestamp', label: '时间戳' },
     { path: '/tools/xmind', label: 'XMind用例' },
+    { path: '/tools/geocode', label: '地址转经纬度' },
   ])
 })
 
 test('工具箱默认进入 Markdown 预览并统一身份证生成文案', () => {
   assert.match(topBarSource, /<router-link to="\/tools" class="topbar-tab" :class="\{ active: isToolModule \}">/)
   assert.match(routerSource, /path: '\/tools',[\s\S]*?redirect: '\/tools\/markdown-preview'/)
-  assert.match(layoutSource, /ToolIdCard: '身份证生成'/)
+  assert.match(layoutSource, /path: '\/tools\/id-card', label: '身份证生成'/)
+  assert.match(appLayoutSource, /ToolIdCard: '身份证'/)
   assert.match(routerSource, /path: 'id-card',[\s\S]*?meta: \{ title: '身份证生成', toolTab: 'idcard' \}/)
   assert.match(generateSource, /<el-tab-pane label="身份证生成" name="idcard">/)
 })

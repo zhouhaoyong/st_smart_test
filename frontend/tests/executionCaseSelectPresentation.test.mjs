@@ -46,7 +46,7 @@ assert.match(dialogSource, /props\.checkedCaseIds/, '确认应使用父级维护
 assert.match(executionsSource, /interfaceStatusFilter = ref\(''\)/, '执行集页面应维护接口状态筛选条件')
 assert.match(executionsSource, /caseStatusFilter = ref\(''\)/, '执行集页面应维护用例状态筛选条件')
 assert.match(executionsSource, /@filter="handleCaseTreeFilter"/, '执行集页面应在筛选变化时清空选择并刷新树')
-assert.match(executionsSource, /checkedCaseIds\.value = \[\]/, '筛选条件变化后应清空已选用例')
+assert.match(executionsSource, /const handleCaseTreeFilter = \(\) =>\s*\{\s*filterTreeData\(\)\s*\}/, '筛选条件变化后应刷新可见树数据并保留父级选中集合')
 assert.match(executionsSource, /workflow_status/, '执行集页面应按接口处理状态筛选')
 assert.match(executionsSource, /confirm_status/, '执行集页面应按用例确认状态筛选')
 

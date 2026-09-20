@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">精致脉冲加载图标</title>
+  <desc id="desc">由轻量核心、开放轨道和脉冲节点组成的 AI 处理中图标</desc>
+  <defs>
+    <radialGradient id="pulse-core" cx="32%" cy="24%" r="78%">
+      <stop offset="0" stop-color="#fff" />
+      <stop offset="1" stop-color="#edf2ff" />
+    </radialGradient>
+    <linearGradient id="pulse-gradient" x1="16%" y1="88%" x2="88%" y2="12%">
+      <stop offset="0" stop-color="#3b82f6" />
+      <stop offset=".55" stop-color="#687dff" />
+      <stop offset="1" stop-color="#9a72eb" />
+    </linearGradient>
+  </defs>
+
+  <circle cx="80" cy="80" r="50" fill="none" stroke="#e9efff" stroke-width="2" />
+
+  <g class="pulse-orbit">
+    <animateTransform attributeName="transform" type="rotate" from="0 80 80" to="360 80 80" dur="4.2s" repeatCount="indefinite" />
+    <path
+      d="M80 29a51 51 0 0 1 46 79"
+      fill="none"
+      stroke="url(#pulse-gradient)"
+      stroke-width="4"
+      stroke-linecap="round"
+      stroke-dasharray="52 17"
+    />
+    <circle class="pulse-node" cx="129" cy="58" r="5" fill="#7a7fff">
+      <animate attributeName="r" values="4.2;5.6;4.2" dur="1.8s" repeatCount="indefinite" />
+      <animate attributeName="opacity" values=".68;1;.68" dur="1.8s" repeatCount="indefinite" />
+    </circle>
+  </g>
+
+  <g class="pulse-core">
+    <circle cx="80" cy="80" r="31" fill="url(#pulse-core)" stroke="#d9e4ff" stroke-width="2" />
+    <circle cx="80" cy="80" r="24" fill="none" stroke="#d5e1ff" stroke-width="1.5" stroke-dasharray="3 7" opacity=".9">
+      <animate attributeName="opacity" values=".55;.95;.55" dur="2.4s" repeatCount="indefinite" />
+    </circle>
+  </g>
+
+  <path class="pulse-bolt" d="m86 48-25 37h17l-5 28 28-45H84Z" fill="url(#pulse-gradient)">
+    <animate attributeName="opacity" values=".78;1;.78" dur="1.6s" repeatCount="indefinite" />
+  </path>
+</svg>

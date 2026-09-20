@@ -1,0 +1,105 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Backend virtual environment
+backend/.venv/
+backend/venv/
+
+# Local assistant configuration
+.claude/
+
+# FastAPI
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+frontend/dist/
+.DS_Store
+
+# Vite
+.vite/
+
+# Environment and local runtime data
+.env
+.env.*
+!.env.example
+!.env.*.example
+backend/.env
+frontend/.env
+uploads/
+backend/uploads/
+
+# Local tool caches
+.codegraph/
+.cursor/
+
+# Claude
+.claude/
+
+# Local Superpowers skill artifacts
+docs/superpowers/
+
+# Local AI handoff notes
+docs/AI_HANDOFF.local.md
+
+# Reasonix
+.reasonix/
+reasonix.toml
+
+# superpowers
+.superpowers/
+
+# ruff
+.ruff_cache/
+
+# Pytest
+**/.pytest_cache/
+
+#superpower
+.superpowers/
+
+.obsidian/

@@ -1,0 +1,8 @@
+# Windows 专用覆盖文件 — 挂载本地盘符到容器内 /mnt，供文件上传功能使用
+# 使用方式：docker-compose -f docker-compose.yml -f docker-compose.windows.yml up -d --build
+# macOS/Linux 用户不需要此文件，直接 docker-compose up 即可
+services:
+  backend:
+    volumes:
+      - c:/:/mnt/c:ro
+      - d:/:/mnt/d:ro

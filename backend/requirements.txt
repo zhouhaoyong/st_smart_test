@@ -1,0 +1,39 @@
+# FastAPI and ASGI server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Database
+sqlalchemy==2.0.36
+asyncmy==0.2.9
+alembic==1.13.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.6
+
+# Validation
+pydantic
+pydantic-settings==2.1.0
+
+# CORS
+fastapi-cors==0.0.6
+
+# Encryption for stored credentials
+cryptography
+
+# Utilities
+python-dotenv==1.0.0
+httpx==0.27.0
+# 修复 LLM 返回的非法 JSON（未转义引号 / 漏逗号 / 未闭合等），AI 结构化解析兜底
+json-repair>=0.30,<1.0
+requests==2.31.0
+PyYAML==6.0.2
+croniter==6.2.4
+
+# OSS (阿里云对象存储)
+oss2==2.19.0
+
+# Excel 读写（Xmind 转换工具）
+openpyxl==3.1.2

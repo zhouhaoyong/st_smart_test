@@ -1,0 +1,121 @@
+/*
+ * Markdown 正文统一排版（全局样式，main.js 引入）
+ *
+ * 背景：站内多处用 v-html 渲染 renderMarkdown() 的产物（需求预览、合并需求详情、
+ * 补全正文预览…），此前每个组件在自己的 scoped 样式里用 :deep() 各写一套排版，
+ * 结果是有的漏了表格、有的漏了 hr/图片，同一份 Markdown 在不同弹窗里长得不一样。
+ * 现统一：v-html 容器加 class="markdown-body"，排版只在此文件维护；组件里只保留
+ * 容器自身的布局（flex / padding / 背景 / 边框 / 滚动）。
+ *
+ * 注意：
+ * - 这里必须是全局样式。v-html 插入的节点不带组件 scoped 的 data-v 属性，
+ *   写在组件 scoped 里只能靠 :deep()，也就回到了各写一套的老路。
+ * - 字号用 em 相对单位，容器可自行决定基准字号（14px / 15px 均可），标题按比例缩放。
+ */
+
+.markdown-body {
+  color: var(--el-text-color-primary);
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+/* ---------- 标题 ---------- */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 1.1em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.markdown-body h1 { font-size: 1.6em; }
+.markdown-body h2 { font-size: 1.35em; }
+.markdown-body h3 { font-size: 1.18em; }
+.markdown-body h4 { font-size: 1.06em; }
+.markdown-body h5,
+.markdown-body h6 { font-size: 1em; color: var(--el-text-color-regular); }
+/* 首元素不留上边距，避免容器顶部出现一段空白 */
+.markdown-body > :first-child { margin-top: 0; }
+
+/* ---------- 段落 / 列表 ---------- */
+.markdown-body p { margin: 0 0 0.8em; }
+.markdown-body ul,
+.markdown-body ol { margin: 0 0 0.8em; padding-left: 1.6em; }
+.markdown-body li { margin: 0.2em 0; }
+.markdown-body li > ul,
+.markdown-body li > ol { margin: 0.2em 0; }
+/* GFM 任务列表：去掉列表符号，复选框与文字对齐 */
+.markdown-body li:has(> input[type='checkbox']) { list-style: none; margin-left: -1.2em; }
+.markdown-body input[type='checkbox'] { margin-right: 6px; vertical-align: middle; }
+
+/* ---------- 行内元素 ---------- */
+.markdown-body strong { font-weight: 600; }
+.markdown-body del { color: var(--el-text-color-secondary); }
+.markdown-body a { color: var(--el-color-primary); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body img { max-width: 100%; border-radius: 4px; }
+
+/* ---------- 代码 ---------- */
+.markdown-body code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--el-fill-color);
+  font: 0.88em/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.markdown-body pre {
+  margin: 0 0 0.9em;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+}
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+  white-space: pre;
+}
+
+/* ---------- 引用 / 分割线 ---------- */
+.markdown-body blockquote {
+  margin: 0 0 0.9em;
+  padding: 2px 14px;
+  color: var(--el-text-color-regular);
+  border-left: 3px solid var(--el-border-color);
+}
+.markdown-body blockquote > :last-child { margin-bottom: 0; }
+.markdown-body hr {
+  height: 0;
+  margin: 1.4em 0;
+  border: 0;
+  border-top: 1px solid var(--el-border-color-light);
+}
+
+/* ---------- 表格 ----------
+ * display: block + width: max-content：宽表格（需求文档里的权限矩阵等）不被压缩换行，
+ * 超出容器时自己出现横向滚动条，而不是把每个单元格挤成竖条文字。
+ */
+.markdown-body table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 0.9em;
+  overflow-x: auto;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 0.95em;
+}
+.markdown-body th,
+.markdown-body td {
+  padding: 7px 12px;
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid var(--el-border-color);
+}
+.markdown-body th {
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--el-fill-color-light);
+}
+.markdown-body tbody tr:nth-child(even) { background: var(--el-fill-color-lighter); }

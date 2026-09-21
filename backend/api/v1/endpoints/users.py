@@ -13,6 +13,7 @@ from core.security import get_password_hash, get_current_active_user, revoke_log
 from core.response import success_response, UnifiedException
 from core.timezone import beijing_now
 from utils.oss_client import resolve_file_url
+from utils.avatar import create_default_avatar
 from core.permissions import ensure_super_admin, is_super_admin, normalize_role_flags
 
 # 需要排除的敏感字段，禁止通过 setattr 赋值
@@ -268,6 +269,8 @@ async def create_user(
     )
 
     db.add(db_user)
+    await db.flush()
+    db_user.avatar = create_default_avatar(db_user.id, db_user.real_name)
     await db.commit()
     await db.refresh(db_user)
 

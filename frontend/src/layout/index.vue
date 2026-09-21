@@ -79,9 +79,10 @@
               <el-icon :size="20"><Document /></el-icon>
               <span>执行策略管理</span>
             </router-link>
-            <router-link to="/feedback" class="nav-item" :class="{ active: route.path === '/feedback' }">
+            <router-link :to="feedbackNavTarget" class="nav-item" :class="{ active: route.path === '/feedback' }">
               <el-icon :size="20"><Link /></el-icon>
               <span>问题反馈</span>
+              <span v-if="feedbackReminderCount > 0" class="nav-item-count">{{ formatBadgeCount(feedbackReminderCount) }}</span>
             </router-link>
             <router-link v-if="isSuperAdmin" to="/data-admin/audit" class="nav-item" :class="{ active: route.path === '/data-admin/audit' }">
               <el-icon :size="20"><Timer /></el-icon>
@@ -128,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, provide } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { getProject } from '@/api/project'
@@ -137,6 +138,7 @@ import { getParameterSets } from '@/api/parameterSet'
 import TopBar from '@/layout/TopBar.vue'
 import { Link, Document, DataAnalysis, List, Timer, User } from '@element-plus/icons-vue'
 import { isAdmin as hasAdminRole } from '@/utils/permission'
+import { getFeedbackReminders } from '@/api/feedback'
 
 const router = useRouter()
 const route = useRoute()
@@ -151,6 +153,29 @@ const adminPageNames = new Set(['Profile', 'Users', 'DataAdminAudit', 'DataAdmin
 const isAdminPage = computed(() => adminPageNames.has(route.name))
 const isSuperAdmin = computed(() => userStore.userInfo?.is_superuser)
 const isManager = computed(() => hasAdminRole(userStore.userInfo))
+const feedbackReminderCount = ref(0)
+const feedbackNavTarget = computed(() => feedbackReminderCount.value > 0 && isSuperAdmin.value
+  ? { path: '/feedback', query: { tab: 'todo' } }
+  : '/feedback')
+
+function formatBadgeCount(count) {
+  const value = Number(count || 0)
+  return value > 99 ? '99+' : value
+}
+
+async function loadFeedbackReminderCount() {
+  if (!userStore.userInfo) return
+  try {
+    const data = await getFeedbackReminders()
+    feedbackReminderCount.value = Number(isSuperAdmin.value ? data?.todo_count : data?.my_attention_count) || 0
+  } catch {
+    feedbackReminderCount.value = 0
+  }
+}
+
+function onFeedbackRemindersRefresh() {
+  loadFeedbackReminderCount()
+}
 
 const environments = ref([])
 const envsLoading = ref(false)
@@ -326,7 +351,13 @@ const fetchProject = async () => {
 
 onMounted(async () => {
   if (!userStore.userInfo) await userStore.getUserInfo()
+  loadFeedbackReminderCount()
+  window.addEventListener('feedback-reminders-refresh', onFeedbackRemindersRefresh)
   if (isProjectPage.value && projectId.value) { fetchProject(); loadEnvironments(); loadParameterSets() }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('feedback-reminders-refresh', onFeedbackRemindersRefresh)
 })
 </script>
 
@@ -346,6 +377,7 @@ onMounted(async () => {
 .sidebar-nav { padding: 10px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .nav-group { display: flex; flex-direction: column; gap: 2px; }
 .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 8px; font-size: 15px; font-weight: 500; color: #595959; text-decoration: none; transition: all .2s; }
+.nav-item-count { min-width: 18px; height: 18px; padding: 0 5px; margin-left: auto; border-radius: 9px; background: #f56c6c; color: #fff; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
 .nav-item:hover { background: #f0f0f0; color: #1a1a1a; }
 .nav-item.active { background: #e6f4ff; color: #1677ff; font-weight: 600; }
 .sidebar-env { padding: 10px; border-top: 1px solid #f0f0f0; margin-top: auto; }

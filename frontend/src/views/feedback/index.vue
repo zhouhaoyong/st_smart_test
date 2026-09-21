@@ -24,9 +24,23 @@
 
     <div class="scroll-area" v-loading="loading">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="我的反馈" name="my" />
-        <el-tab-pane v-if="isAdmin" label="待解决" name="todo" />
-        <el-tab-pane v-if="isAdmin" label="全部反馈" name="all" />
+        <el-tab-pane name="my">
+          <template #label>
+            <span class="feedback-tab-label">
+              <span>我的反馈</span>
+              <span v-if="myFeedbackBadgeCount > 0" class="tab-count">{{ formatBadgeCount(myFeedbackBadgeCount) }}</span>
+            </span>
+          </template>
+        </el-tab-pane>
+        <el-tab-pane v-if="isSuperAdmin" name="todo">
+          <template #label>
+            <span class="feedback-tab-label">
+              <span>待解决</span>
+              <span v-if="todoFeedbackBadgeCount > 0" class="tab-count">{{ formatBadgeCount(todoFeedbackBadgeCount) }}</span>
+            </span>
+          </template>
+        </el-tab-pane>
+        <el-tab-pane v-if="isSuperAdmin" label="全部反馈" name="all" />
       </el-tabs>
 
       <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="load-error">
@@ -92,7 +106,7 @@
         <div class="flow-step"><span>2</span><div><b>沟通处理</b><p>处理人可以“仅回复”，提交人也可以补充说明；所有互动都会保留在详情里。</p></div></div>
         <div class="flow-step"><span>3</span><div><b>解决确认</b><p>处理人点击“解决”后进入“待确认”，等待提交人验收。</p></div></div>
         <div class="flow-step"><span>4</span><div><b>最终收口</b><p>提交人认可后点击“确认完成”；如果仍有问题，点击“继续反馈”，问题会回到“待处理”。</p></div></div>
-        <div class="flow-note">列表规则：“我的反馈”只看自己提交的反馈；“待解决”展示其他人提交且尚未完成的反馈；“全部反馈”展示所有反馈。</div>
+        <div class="flow-note">列表规则：普通用户和管理员只看自己提交的反馈；超管可查看全部反馈，“待解决”展示所有尚未完成的反馈。</div>
       </div>
     </el-dialog>
 
@@ -157,7 +171,6 @@
           <span>{{ detail.user_name }}</span>
           <span class="dot">·</span>
           <span>{{ formatTime(detail.created_at) }}</span>
-          <span v-if="detail.page_url" class="page-link" @click="copyUrl(detail.page_url)">复制页面链接</span>
         </div>
         <div class="detail-section">
           <div class="detail-label">详细描述</div>
@@ -190,6 +203,12 @@
                 <el-tag v-if="item.status" :type="statusTag(item.status)" size="small" effect="plain">{{ statusLabel(item.status) }}</el-tag>
               </div>
               <div class="interaction-content">{{ item.content || '-' }}</div>
+              <div v-if="interactionPageUrl(item, index)" class="interaction-page">
+                <span class="interaction-page-label">页面地址：</span>
+                <span class="interaction-page-url" :title="interactionPageUrl(item, index)">{{ interactionPageUrl(item, index) }}</span>
+                <el-button link type="primary" size="small" @click.stop="copyUrl(interactionPageUrl(item, index))">复制</el-button>
+                <el-button link type="primary" size="small" @click.stop="openPageUrl(interactionPageUrl(item, index))">打开</el-button>
+              </div>
             </div>
           </div>
         </div>
@@ -213,7 +232,7 @@
               <el-input v-model="replyForm.admin_reply" type="textarea" :rows="3" :placeholder="replyPlaceholder" maxlength="200" show-word-limit :disabled="isFeedbackLockedForConfirm" />
               <div style="margin-top:10px;display:flex;gap:8px">
                 <el-button type="primary" :loading="replying" :disabled="isFeedbackLockedForConfirm" @click="submitReply">{{ replyButtonText }}</el-button>
-                <el-button v-if="canHandleFeedback" type="success" :loading="resolving" :disabled="isFeedbackLockedForConfirm" @click="handleResolve">解决</el-button>
+                <el-button v-if="canResolveFeedback" type="success" :loading="resolving" :disabled="isFeedbackLockedForConfirm" @click="handleResolve">解决</el-button>
               </div>
             </div>
           </template>
@@ -231,28 +250,32 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatBeijingMinute } from '@/utils/beijingTime'
 import { Plus, CircleClose, Search } from '@element-plus/icons-vue'
-import { confirmCloseFeedback, createFeedback, getFeedback, getFeedbacks, reopenFeedback, replyFeedback, resolveFeedback, deleteFeedback, uploadFeedbackImage } from '@/api/feedback'
+import { confirmCloseFeedback, createFeedback, getFeedback, getFeedbackReminders, getFeedbacks, reopenFeedback, replyFeedback, resolveFeedback, deleteFeedback, uploadFeedbackImage } from '@/api/feedback'
 import { copyToClipboard } from '@/utils/clipboard'
 
 const userStore = useUserStore()
 const route = useRoute()
-const isAdmin = computed(() => userStore.userInfo?.is_superuser || userStore.userInfo?.is_manager)
+const isSuperAdmin = computed(() => userStore.userInfo?.is_superuser)
 const currentUserId = computed(() => userStore.userInfo?.id)
 const isDetailOwner = computed(() => detail.value?.user_id === currentUserId.value)
 const canConfirmFeedback = computed(() => isDetailOwner.value && detail.value?.status === 'pending_confirm')
-const canHandleFeedback = computed(() => isAdmin.value && !isDetailOwner.value)
+const canHandleFeedback = computed(() => isSuperAdmin.value && !isDetailOwner.value)
+const canResolveFeedback = computed(() => isSuperAdmin.value && detail.value && !isFinishedStatus(detail.value.status) && detail.value.status !== 'pending_confirm')
 const isFeedbackLockedForConfirm = computed(() => detail.value?.status === 'pending_confirm')
 const canReplyFeedback = computed(() => !isFinishedStatus(detail.value?.status) && (canHandleFeedback.value || (isDetailOwner.value && !isFeedbackLockedForConfirm.value)))
 const replySectionTitle = computed(() => isDetailOwner.value ? '补充说明' : '回复 / 处理')
 const replyPlaceholder = computed(() => isDetailOwner.value ? '补充问题现象、复现步骤或最新信息（最多200字）' : '回复内容（最多200字）')
 const replyButtonText = computed(() => isDetailOwner.value ? '提交补充' : '仅回复')
 const detailInteractions = computed(() => Array.isArray(detail.value?.interaction_logs) ? detail.value.interaction_logs : [])
+const reminderCounts = ref({ todo_count: 0, my_attention_count: 0 })
+const myFeedbackBadgeCount = computed(() => Number(reminderCounts.value.my_attention_count || 0))
+const todoFeedbackBadgeCount = computed(() => Number(reminderCounts.value.todo_count || 0))
 
 const activeTab = ref('my')
 const keyword = ref('')
@@ -303,14 +326,51 @@ function formatTime(t) {
   return formatBeijingMinute(t)
 }
 
+function formatBadgeCount(count) {
+  const value = Number(count || 0)
+  return value > 99 ? '99+' : value
+}
+
+function interactionPageUrl(item, index) {
+  if (item?.type !== 'submit') return ''
+  return item.page_url || (index === 0 ? detail.value?.page_url : '') || ''
+}
+
 async function copyUrl(url) {
   if (await copyToClipboard(url)) ElMessage.success('链接已复制')
 }
 
-onMounted(() => {
+function openPageUrl(url) {
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+async function loadReminderCounts() {
+  try {
+    const data = await getFeedbackReminders()
+    reminderCounts.value = {
+      todo_count: Number(data?.todo_count || 0),
+      my_attention_count: Number(data?.my_attention_count || 0),
+    }
+  } catch {
+    reminderCounts.value = { todo_count: 0, my_attention_count: 0 }
+  }
+}
+
+function onFeedbackRemindersRefresh() {
+  loadReminderCounts()
+}
+
+onMounted(async () => {
   form.value.page_url = window.location.href
   applyRouteQuery()
-  loadList()
+  await loadList()
+  await loadReminderCounts()
+  await openRouteFeedback()
+  window.addEventListener('feedback-reminders-refresh', onFeedbackRemindersRefresh)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('feedback-reminders-refresh', onFeedbackRemindersRefresh)
 })
 
 // 弹窗打开期间监听全局粘贴（弹窗内任意位置 Ctrl+V 生效，不重复触发）
@@ -352,10 +412,17 @@ async function loadList() {
 }
 
 function applyRouteQuery() {
-  if (route.query.tab === 'todo' && isAdmin.value) activeTab.value = 'todo'
-  else if (route.query.tab === 'all' && isAdmin.value) activeTab.value = 'all'
+  if (route.query.tab === 'todo' && isSuperAdmin.value) activeTab.value = 'todo'
+  else if (route.query.tab === 'all' && isSuperAdmin.value) activeTab.value = 'all'
   else activeTab.value = 'my'
   filterStatus.value = route.query.status || null
+}
+
+async function openRouteFeedback() {
+  const feedbackId = Number(route.query.feedback_id)
+  if (!feedbackId) return
+  await openDetail({ id: feedbackId })
+  window.dispatchEvent(new Event('feedback-reminders-refresh'))
 }
 
 function handleTabChange() {
@@ -514,9 +581,10 @@ async function handleDelete() {
   } catch {}
 }
 
-watch(() => route.query, () => {
+watch(() => route.query, async () => {
   applyRouteQuery()
-  loadList()
+  await loadList()
+  await openRouteFeedback()
 })
 </script>
 
@@ -529,6 +597,8 @@ watch(() => route.query, () => {
 .scroll-area { flex: 1; overflow-y: auto; min-height: 0; }
 .load-error { margin-bottom: 10px; }
 .pagination-area { flex-shrink: 0; display: flex; justify-content: flex-end; padding: 12px 0 0; }
+.feedback-tab-label { display: inline-flex; align-items: center; gap: 6px; }
+.tab-count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #f56c6c; color: #fff; font-size: 11px; font-weight: 600; line-height: 16px; text-align: center; }
 
 /* 截图输入框 */
 .screenshot-input {
@@ -564,7 +634,6 @@ watch(() => route.query, () => {
 .detail-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .detail-title { font-size: 18px; font-weight: 600; }
 .detail-meta { font-size: 13px; color: #909399; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
-.page-link { color: var(--nexus-primary, #1677ff); cursor: pointer; }
 .detail-section { margin-bottom: 16px; }
 .detail-label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
 .detail-content { color: #333; line-height: 1.7; white-space: pre-wrap; font-size: 14px; }
@@ -577,6 +646,10 @@ watch(() => route.query, () => {
 .interaction-user { font-size: 13px; color: #303133; }
 .interaction-time { font-size: 12px; color: #909399; }
 .interaction-content { color: #333; line-height: 1.6; white-space: pre-wrap; font-size: 14px; }
+.interaction-page { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; color: #606266; font-size: 13px; }
+.interaction-page-label { flex: 0 0 auto; }
+.interaction-page-url { min-width: 0; overflow: hidden; color: #606266; text-overflow: ellipsis; white-space: nowrap; }
+.interaction-page :deep(.el-button) { flex: 0 0 auto; height: 24px; padding: 0 4px; }
 .detail-actions { margin-top: 8px; }
 .owner-confirm-actions { margin-top: 8px; }
 .confirm-tip { color: #606266; font-size: 13px; line-height: 1.6; margin-bottom: 10px; }

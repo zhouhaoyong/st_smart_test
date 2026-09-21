@@ -85,7 +85,7 @@ class AiPlatformQuotaSetting(Base):
     __table_args__ = {'comment': 'AI平台配额设置表'}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="记录ID")
-    daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, comment="平台模型共享日额度，配额记录必须为正整数")
+    daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, comment="平台模型共享日额度，0 表示暂停非超管平台模型使用")
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, comment="最后更新人")
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, comment="软删除标记")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="删除时间")

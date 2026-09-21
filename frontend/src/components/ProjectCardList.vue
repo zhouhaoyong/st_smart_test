@@ -27,10 +27,12 @@
       </div>
       <div class="project-meta">
         <div class="project-owner" v-if="project.owner">
-          <div class="owner-avatar" :style="project.owner.avatar ? {} : { background: getOwnerAvatarBg(project.owner.id), color: '#fff' }">
-            <img v-if="project.owner.avatar" :src="project.owner.avatar" class="avatar-img" />
-            <span v-else>{{ project.owner.real_name?.charAt(0) }}</span>
-          </div>
+          <UserAvatar
+            :size="24"
+            :src="project.owner.avatar"
+            :name="project.owner.real_name"
+            :user-id="project.owner.id"
+          />
           <span>{{ project.owner.real_name }}</span>
         </div>
         <span class="meta-text">{{ formatDate(project.created_at) }}</span>
@@ -56,6 +58,7 @@
 <script setup>
 import { formatBeijingDate } from '@/utils/beijingTime'
 import { FolderOpened, Plus } from '@element-plus/icons-vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 defineProps({
   projects: { type: Array, default: () => [] },
@@ -79,9 +82,7 @@ const avatarBgColors = [
   'linear-gradient(135deg, #ee9187 0%, #d8554c 100%)',
   'linear-gradient(135deg, #8fa7eb 0%, #5873c9 100%)',
 ]
-const ownerAvatarColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
 const formatDate = (d) => d ? formatBeijingDate(d) || '-' : '-'
-const getOwnerAvatarBg = (userId) => ownerAvatarColors[(userId || 0) % ownerAvatarColors.length]
 </script>
 
 <style scoped>
@@ -107,11 +108,6 @@ const getOwnerAvatarBg = (userId) => ownerAvatarColors[(userId || 0) % ownerAvat
 .project-tags-empty { font-size: 12px; color: #c0c4cc; }
 .project-meta { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #8c8c8c; font-size: 13px; }
 .project-owner { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.owner-avatar {
-  width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 12px; overflow: hidden; flex-shrink: 0;
-}
-.avatar-img { width: 100%; height: 100%; object-fit: cover; }
 .meta-text { white-space: nowrap; }
 .project-card-footer { margin-top: 14px; padding-top: 14px; border-top: 1px solid #eef2f6; }
 .project-actions { display: flex; justify-content: center; gap: 8px; }

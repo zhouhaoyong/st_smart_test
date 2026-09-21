@@ -532,7 +532,8 @@ const submitLegacy = async () => {
 
 provide('workbenchContext', {
     dashboardStats,
-  systems,
+  selectedProject,
+    systems,
   versions,
   selectedSystem,
     selectedVersion,

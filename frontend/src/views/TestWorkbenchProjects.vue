@@ -15,7 +15,7 @@
       @create="handleCreate"
     >
       <template #actions>
-        <el-button plain size="large" :icon="QuestionFilled" @click="guideVisible = true">使用指南</el-button>
+        <el-button plain size="default" :icon="QuestionFilled" @click="guideVisible = true">使用指南</el-button>
       </template>
     </ProjectSearchBar>
 

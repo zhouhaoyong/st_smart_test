@@ -6,10 +6,7 @@
           <th>{{ row.label }}</th>
           <td>
             <div v-if="row.person" class="metadata-person">
-              <span class="metadata-avatar" :style="avatarStyle(row)">
-                <img v-if="row.avatar" :src="row.avatar" :alt="`${row.label}头像`" />
-                <span v-else>{{ avatarInitial(row.name) }}</span>
-              </span>
+              <UserAvatar :size="24" :src="row.avatar" :name="row.name" :user-id="row.userId" :alt="`${row.label}头像`" />
               <span class="metadata-person-name">{{ row.name || '—' }}</span>
             </div>
             <span v-else>{{ row.value || '—' }}</span>
@@ -23,6 +20,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatBeijingTime } from '@/utils/beijingTime'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const props = defineProps({
   record: { type: Object, default: () => ({}) },
@@ -56,12 +54,6 @@ const rows = computed(() => {
 
 const formatTime = (value) => value ? formatBeijingTime(value) : ''
 
-function avatarInitial(name) {
-  return (name || '?').trim().charAt(0) || '?'
-}
-
-const avatarColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarStyle = (row) => ({ background: avatarColors[(row.userId || 0) % avatarColors.length] })
 </script>
 
 <style scoped>
@@ -110,26 +102,6 @@ td {
   gap: 8px;
   max-width: 100%;
   vertical-align: middle;
-}
-
-.metadata-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  overflow: hidden;
-  border-radius: 50%;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.metadata-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .metadata-person-name {

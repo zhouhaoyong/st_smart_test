@@ -46,7 +46,7 @@ from services.ai_quota_service import (
     check_user_ai_quota, get_platform_model_usage,
     get_platform_quota_setting, get_usage_summary, get_user_quota,
     get_user_model_quota_info, get_users_platform_quota_info, get_user_usage_quota_stats,
-    list_users_with_quota_info, set_platform_quota_setting, set_user_model_quota, get_valid_quota_limit,
+    list_users_with_quota_info, set_platform_quota_setting, set_user_model_quota, get_configured_quota_limit, get_valid_quota_limit,
     soft_delete_usage_logs,
 )
 from utils.audit_logger import log_operation, log_user_operation
@@ -203,7 +203,8 @@ async def api_quota_info(db: AsyncSession = Depends(get_db), current_user: User 
     """Return today's quota info for the current user."""
     try:
         platform_quota_setting = await get_platform_quota_setting(db)
-        daily_limit = -1 if _is_superadmin(current_user) else get_valid_quota_limit(await get_user_quota(db, current_user.id))
+        configured_platform_limit = get_configured_quota_limit(platform_quota_setting.daily_limit if platform_quota_setting else None)
+        daily_limit = -1 if _is_superadmin(current_user) else configured_platform_limit
         today_used = await get_platform_model_usage(db, current_user.id)
         personal_model_result = await db.execute(
             select(AiModel.id)
@@ -227,10 +228,10 @@ async def api_quota_info(db: AsyncSession = Depends(get_db), current_user: User 
         return success_response(data={
             "quota": daily_limit,
             "today_used": today_used,
-            "remaining": max(0, daily_limit - today_used) if daily_limit is not None and daily_limit > 0 else (-1 if _is_superadmin(current_user) else None),
-            "has_access": _is_superadmin(current_user) or daily_limit is not None or has_personal_model_access,
+            "remaining": max(0, daily_limit - today_used) if daily_limit is not None and daily_limit >= 0 else (-1 if _is_superadmin(current_user) else None),
+            "has_access": _is_superadmin(current_user) or (daily_limit is not None and daily_limit > 0) or has_personal_model_access,
             "has_personal_model_access": has_personal_model_access,
-            "platform_quota_setting": get_valid_quota_limit(platform_quota_setting.daily_limit if platform_quota_setting else None),
+            "platform_quota_setting": configured_platform_limit,
         })
     except Exception as exc:
         logger.exception("Failed to load quota info")
@@ -244,7 +245,7 @@ async def api_get_platform_quota_setting(
     """所有用户可查看平台模型额度；配置仅由超管修改。"""
     try:
         setting = await get_platform_quota_setting(db)
-        return success_response(data={"daily_limit": get_valid_quota_limit(setting.daily_limit if setting else None)})
+        return success_response(data={"daily_limit": get_configured_quota_limit(setting.daily_limit if setting else None)})
     except Exception:
         logger.exception("Failed to load platform quota setting")
         return error_response(code=500, message="平台模型额度查询失败，请稍后重试")
@@ -261,7 +262,7 @@ async def api_set_platform_quota_setting(
     await log_operation(
         db=db, user_id=current_user.id, user_name=current_user.real_name,
         module="ai_quota", operation="设置平台模型额度", target_id=setting.id,
-        target_name="平台模型额度", description=f"设置普通用户平台模型日额度：{setting.daily_limit} 次",
+        target_name="平台模型额度", description=f"设置非超管用户平台模型日额度：{setting.daily_limit} 次",
     )
     await db.commit()
     return success_response(data={"daily_limit": setting.daily_limit}, message="平台模型额度已更新")
@@ -288,7 +289,7 @@ async def api_usage_logs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Paginated AI usage logs. Superadmin/admin can see all; users see only self."""
+    """分页查询 AI 用量记录；超级管理员可查看全部，管理员和普通用户仅查看本人。"""
     try:
         from services.ai_quota_service import normalize_usage_filters
 

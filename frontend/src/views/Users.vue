@@ -33,6 +33,9 @@
             <el-button @click="handleReset">重置</el-button>
           </div>
         </el-form-item>
+        <el-form-item>
+          <el-button @click="roleHelpVisible = true">角色说明</el-button>
+        </el-form-item>
         <el-form-item v-if="canCreateUser(userStore.userInfo)">
           <el-button type="primary" @click="handleAdd">添加用户</el-button>
         </el-form-item>
@@ -169,6 +172,76 @@
       </template>
     </el-dialog>
 
+    <!-- 角色说明 -->
+    <el-dialog v-model="roleHelpVisible" title="角色说明" width="1180px" destroy-on-close>
+      <div class="role-help">
+        <p class="role-help-intro">平台角色决定系统功能权限，部门只表示组织归属，不会自动授予权限。项目创建人权限按项目规则另行叠加。</p>
+        <el-tabs v-model="roleHelpTab" class="role-help-tabs">
+          <el-tab-pane label="测试工作台" name="workbench">
+            <el-table :data="roleHelpTables.workbench.rows" border max-height="520" class="role-help-table">
+              <el-table-column
+                v-for="column in roleHelpTables.workbench.columns"
+                :key="column.prop"
+                :prop="column.prop"
+                :label="column.label"
+                :width="column.width"
+                :min-width="column.minWidth"
+              />
+            </el-table>
+          </el-tab-pane>
+          <el-tab-pane label="API 测试" name="api">
+            <el-table :data="roleHelpTables.api.rows" border max-height="520" class="role-help-table">
+              <el-table-column
+                v-for="column in roleHelpTables.api.columns"
+                :key="column.prop"
+                :prop="column.prop"
+                :label="column.label"
+                :width="column.width"
+                :min-width="column.minWidth"
+              />
+            </el-table>
+          </el-tab-pane>
+          <el-tab-pane label="工具箱" name="tools">
+            <el-table :data="roleHelpTables.tools.rows" border max-height="520" class="role-help-table">
+              <el-table-column
+                v-for="column in roleHelpTables.tools.columns"
+                :key="column.prop"
+                :prop="column.prop"
+                :label="column.label"
+                :width="column.width"
+                :min-width="column.minWidth"
+              />
+            </el-table>
+            <p class="role-help-tab-note">工具箱是通用工具模块，登录用户均可使用，不授予项目或平台管理权限。</p>
+          </el-tab-pane>
+          <el-tab-pane label="导航管理" name="navigation">
+            <el-table :data="roleHelpTables.navigation.rows" border max-height="520" class="role-help-table">
+              <el-table-column
+                v-for="column in roleHelpTables.navigation.columns"
+                :key="column.prop"
+                :prop="column.prop"
+                :label="column.label"
+                :width="column.width"
+                :min-width="column.minWidth"
+              />
+            </el-table>
+          </el-tab-pane>
+          <el-tab-pane label="管理中心" name="management">
+            <el-table :data="roleHelpTables.management.rows" border max-height="520" class="role-help-table">
+              <el-table-column
+                v-for="column in roleHelpTables.management.columns"
+                :key="column.prop"
+                :prop="column.prop"
+                :label="column.label"
+                :width="column.width"
+                :min-width="column.minWidth"
+              />
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </el-dialog>
+
     <!-- 密码重置结果弹窗 -->
     <el-dialog v-model="pwdDialogVisible" title="密码已重置" width="420px" :close-on-click-modal="false">
       <div class="pwd-result">
@@ -215,8 +288,98 @@ const pwdDialogVisible = ref(false)
 const newPassword = ref('')
 const detailVisible = ref(false)
 const detailUserId = ref(null)
+const roleHelpVisible = ref(false)
+const roleHelpTab = ref('workbench')
 const deptMap = { 1: '测试部门', 2: '开发部门', 4: '产品部门', 3: '运维部门', 5: '其他部门' }
 const userStore = useUserStore()
+
+const projectRoleColumns = [
+  { prop: 'operation', label: '操作', width: '210' },
+  { prop: 'owner', label: '项目创建人', width: '150' },
+  { prop: 'superAdmin', label: '超级管理员（非项目创建人）', minWidth: '210' },
+  { prop: 'manager', label: '管理员（非项目创建人）', minWidth: '190' },
+  { prop: 'normal', label: '普通用户（非项目创建人）', minWidth: '190' },
+]
+
+const roleColumns = [
+  { prop: 'operation', label: '操作', width: '280' },
+  { prop: 'superAdmin', label: '超级管理员', minWidth: '220' },
+  { prop: 'manager', label: '管理员', minWidth: '220' },
+  { prop: 'normal', label: '普通用户', minWidth: '220' },
+]
+
+const roleHelpTables = {
+  workbench: {
+    columns: projectRoleColumns,
+    rows: [
+      { operation: '创建项目', owner: '可以', superAdmin: '可以', manager: '可以', normal: '可以' },
+      { operation: '查看公开项目', owner: '可以', superAdmin: '可以', manager: '可以', normal: '可以' },
+      { operation: '查看私有项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '编辑、删除公开项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '编辑、删除私有项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '复制公开项目', owner: '可以', superAdmin: '可以', manager: '可以', normal: '可以复制公开内容' },
+      { operation: '复制私有项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '管理公开项目资产', owner: '管理全部', superAdmin: '管理全部', manager: '管理全部', normal: '查看全部、维护本人资产' },
+      { operation: '管理私有项目资产', owner: '管理全部', superAdmin: '管理全部', manager: '不可以', normal: '不可以' },
+      { operation: '查看公开项目数据看板', owner: '可以', superAdmin: '可以', manager: '可以', normal: '可以' },
+      { operation: '查看私有项目数据看板', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '清空公开项目数据', owner: '不可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '清空私有项目数据', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '使用测试工作台 AI', owner: '可以', superAdmin: '可以', manager: '可以', normal: '可以' },
+    ],
+  },
+  api: {
+    columns: projectRoleColumns,
+    rows: [
+      { operation: '创建项目', owner: '可以', superAdmin: '可以', manager: '可以', normal: '可以' },
+      { operation: '查看公开项目', owner: '可以', superAdmin: '可以', manager: '可以', normal: '可以' },
+      { operation: '查看私有项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '编辑、删除公开项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '编辑、删除私有项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '复制公开项目', owner: '可以', superAdmin: '可以', manager: '可以', normal: '不可以' },
+      { operation: '复制私有项目', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '管理公开项目接口资产', owner: '管理全部', superAdmin: '管理全部', manager: '管理全部', normal: '查看列表/汇总，详情受限' },
+      { operation: '管理私有项目接口资产', owner: '管理全部', superAdmin: '管理全部', manager: '不可以', normal: '不可以' },
+      { operation: '执行接口测试', owner: '可以', superAdmin: '可以', manager: '可以', normal: '不可以' },
+      { operation: '查看操作记录', owner: '可以', superAdmin: '查看全部', manager: '查看全部', normal: '查看全部' },
+      { operation: '清空公开项目数据', owner: '不可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '清空私有项目数据', owner: '可以', superAdmin: '可以', manager: '不可以', normal: '不可以' },
+      { operation: '使用 API 测试 AI', owner: '可以', superAdmin: '全部项目', manager: '公开及本人私有项目', normal: '仅本人创建项目' },
+    ],
+  },
+  tools: {
+    columns: roleColumns,
+    rows: [
+      { operation: '使用工具箱功能', superAdmin: '可以', manager: '可以', normal: '可以' },
+    ],
+  },
+  navigation: {
+    columns: roleColumns,
+    rows: [
+      { operation: '查看全局导航', superAdmin: '可以', manager: '可以', normal: '可以' },
+      { operation: '新增个人应用入口', superAdmin: '可以', manager: '可以', normal: '可以，归本人' },
+      { operation: '编辑、删除本人应用入口', superAdmin: '可以', manager: '可以', normal: '可以' },
+      { operation: '编辑、删除他人应用入口', superAdmin: '可以', manager: '可以', normal: '不可以' },
+      { operation: '批量处理应用入口', superAdmin: '可以', manager: '可以', normal: '仅限本人应用' },
+      { operation: '配置全局系统导航', superAdmin: '可以', manager: '可以', normal: '不可以' },
+    ],
+  },
+  management: {
+    columns: roleColumns,
+    rows: [
+      { operation: '个人资料', superAdmin: '管理本人', manager: '管理本人', normal: '管理本人' },
+      { operation: '平台用户管理', superAdmin: '全部管理', manager: '不可管理', normal: '不可管理' },
+      { operation: '平台模型', superAdmin: '查看、管理、使用', manager: '查看、使用', normal: '查看、使用' },
+      { operation: '本人模型', superAdmin: '管理本人', manager: '管理本人', normal: '管理本人' },
+      { operation: '他人模型', superAdmin: '查看受限信息', manager: '不可访问', normal: '不可访问' },
+      { operation: 'AI 用量和调用记录', superAdmin: '查看全部、清理全部', manager: '查看本人', normal: '查看本人' },
+      { operation: '消息渠道、消息模板、执行策略', superAdmin: '全部管理', manager: '全部管理', normal: '不可管理' },
+      { operation: '平台治理审计日志', superAdmin: '查看、管理全部', manager: '不可访问', normal: '不可访问' },
+      { operation: '平台数据清理', superAdmin: '可以，需二次确认', manager: '不可以', normal: '不可以' },
+      { operation: '问题反馈', superAdmin: '查看全部、提醒、回复、解决、删除全部', manager: '提交、查看、跟进、删除本人', normal: '提交、查看、跟进、删除本人' },
+    ],
+  },
+}
 
 const searchForm = reactive({ phone: '', real_name: '', department: null, is_active: null, role: null })
 
@@ -466,6 +629,11 @@ onMounted(() => { loadUsers() })
 .search-actions { flex: 0 0 auto; min-width: 0; }
 .search-action-buttons { display: flex; flex-wrap: wrap; gap: 10px 12px; }
 .search-action-buttons :deep(.el-button) { margin: 0; }
+
+.role-help-intro { margin: 0 0 14px; color: #606266; font-size: 14px; line-height: 1.7; }
+.role-help-tabs :deep(.el-tabs__content) { overflow: visible; }
+.role-help-table :deep(.cell) { white-space: normal; line-height: 1.7; word-break: break-word; }
+.role-help-tab-note { margin: 12px 0 0; color: #909399; font-size: 13px; line-height: 1.7; }
 
 .scroll-area { flex: 1; overflow-y: auto; min-height: 0; background: #fff; border: 1px solid #f0f0f0; border-radius: 12px; padding: 4px; }
 .scroll-area :deep(.el-table__body-wrapper) { overflow-y: auto; }

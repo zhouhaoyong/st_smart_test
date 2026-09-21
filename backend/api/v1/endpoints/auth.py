@@ -13,6 +13,7 @@ from core.response import success_response, UnifiedException
 from core.timezone import beijing_now
 from pydantic import BaseModel, field_validator
 from utils.oss_client import resolve_file_url
+from utils.avatar import create_default_avatar
 from utils.audit_logger import log_user_operation
 from core.permissions import get_user_role, is_manager
 from core.user_validation import (
@@ -161,7 +162,6 @@ async def register_user(
         raise UnifiedException(code=400, message="真实姓名已被使用")
 
     # 部门仅表示组织归属，不参与角色授予。公开注册用户统一为普通用户。
-    # 不设置avatar，前端会根据real_name的首字母自动生成头像
     hashed_password = get_password_hash(register_data.password)
     new_user = User(
         phone=register_data.phone,
@@ -170,13 +170,14 @@ async def register_user(
         nick_name=register_data.nick_name,
         gender=register_data.gender,
         department=register_data.department,
-        # avatar=None,  # 不设置头像，前端根据姓名首字母生成
         is_active=True,
         is_superuser=False,
         is_manager=False,
     )
-    
+
     db.add(new_user)
+    await db.flush()
+    new_user.avatar = create_default_avatar(new_user.id, new_user.real_name)
     await db.commit()
     await db.refresh(new_user)
 
@@ -196,6 +197,7 @@ async def register_user(
             "id": new_user.id,
             "phone": new_user.phone,
             "real_name": new_user.real_name,
+            "avatar": resolve_file_url(new_user.avatar),
         },
         message="注册成功"
     )

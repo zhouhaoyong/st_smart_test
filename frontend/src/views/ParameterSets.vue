@@ -21,7 +21,7 @@
     <div class="ps-grid" v-if="list.length > 0">
       <div v-for="ps in list" :key="ps.id" class="ps-card" @click="router.push(`/project/${projectId}/parameter-sets/${ps.id}`)">
         <div class="ps-card-top">
-          <div class="ps-avatar" :style="getAvatarStyle(ps.id)">{{ ps.name.charAt(0) }}</div>
+          <div class="ps-avatar" :style="getResourceAvatarStyle(ps.id)">{{ ps.name.charAt(0) }}</div>
           <div class="ps-card-title">
             <div class="ps-title-text">
               <div class="ps-name-text">{{ ps.name }}</div>
@@ -39,10 +39,12 @@
         </div>
         <div class="ps-card-footer">
           <div class="ps-creator">
-            <div class="creator-avatar" :style="ps.creator_avatar ? {} : getCreatorAvatarStyle(ps.created_by)">
-              <img v-if="ps.creator_avatar" :src="ps.creator_avatar" class="avatar-img" />
-              <span v-else>{{ ps.creator_name?.charAt(0) || '?' }}</span>
-            </div>
+            <UserAvatar
+              :size="24"
+              :src="ps.creator_avatar"
+              :name="ps.creator_name"
+              :user-id="ps.created_by"
+            />
             <span>{{ ps.creator_name || '未知' }}</span>
           </div>
           <div class="ps-card-actions">
@@ -139,6 +141,7 @@ import { getParameterSets, getParameterSet, createParameterSet, updateParameterS
 import { confirmDelete } from '@/utils/confirmDelete'
 import { formatBeijingDate } from '@/utils/beijingTime'
 import GlobalEmpty from '@/components/GlobalEmpty.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -161,15 +164,13 @@ const formRef = ref(null)
 const form = reactive({ id: null, name: '', description: '' })
 const rules = { name: [{ required: true, message: '请输入参数集名称', trigger: 'blur' }] }
 
-const avatarTextColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarBgColors = ['#e6f4ff', '#f0f5ff', '#e6fffb', '#fff7e6', '#f9f0ff', '#fff0f6', '#e6fffb', '#f6ffed']
-function getAvatarStyle(id) {
-  return {
-    background: avatarBgColors[(id || 0) % avatarBgColors.length],
-    color: avatarTextColors[(id || 0) % avatarTextColors.length],
-  }
-}
-const getCreatorAvatarStyle = getAvatarStyle
+const resourceAvatarTextColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
+const resourceAvatarBgColors = ['#e6f4ff', '#f0f5ff', '#e6fffb', '#fff7e6', '#f9f0ff', '#fff0f6', '#e6fffb', '#f6ffed']
+const getResourceAvatarStyle = (id) => ({
+  background: resourceAvatarBgColors[(id || 0) % resourceAvatarBgColors.length],
+  color: resourceAvatarTextColors[(id || 0) % resourceAvatarTextColors.length],
+})
+
 const formatDate = (value) => value ? formatBeijingDate(value) || '-' : '-'
 
 function onSearch() {
@@ -269,8 +270,6 @@ onMounted(() => { loadData() })
 .ps-creator > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta-time { color: #bfbfbf; font-size: 12px; white-space: nowrap; }
 .title-time { flex-shrink: 0; font-weight: 400; }
-.creator-avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; }
 .ps-card-actions { display: flex; align-items: center; gap: 12px; justify-content: flex-end; flex-shrink: 0; }
 .ps-card-actions .el-button + .el-button { margin-left: 0; }
 .ps-card-actions .el-button { min-width: 52px; height: 30px; padding: 6px 10px; border-radius: 6px; }

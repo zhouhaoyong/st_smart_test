@@ -11,7 +11,7 @@
     <div class="env-grid" v-if="environmentList.length > 0">
       <div v-for="env in environmentList" :key="env.id" class="env-card" @click="handleEdit(env)">
         <div class="env-card-top">
-          <div class="env-avatar" :style="getAvatarStyle(env.id)">{{ env.name?.charAt(0) || '-' }}</div>
+          <div class="env-avatar" :style="getResourceAvatarStyle(env.id)">{{ env.name?.charAt(0) || '-' }}</div>
           <div class="env-card-title">
             <span class="env-name-text">{{ env.name }}</span>
             <span class="meta-time title-time">{{ formatDate(env.created_at) }}</span>
@@ -32,10 +32,12 @@
         </div>
         <div class="env-card-footer">
           <div class="env-creator">
-            <div class="creator-avatar" :style="env.creator?.avatar ? {} : getCreatorAvatarStyle(env.creator?.id)">
-              <img v-if="env.creator?.avatar" :src="env.creator.avatar" class="avatar-img" />
-              <span v-else>{{ env.creator?.real_name?.charAt(0) || '-' }}</span>
-            </div>
+            <UserAvatar
+              :size="24"
+              :src="env.creator?.avatar"
+              :name="env.creator?.real_name"
+              :user-id="env.creator?.id"
+            />
             <span>{{ env.creator?.real_name || '未知用户' }}</span>
           </div>
           <div class="env-actions">
@@ -487,6 +489,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, FolderOpened, Delete } from '@element-plus/icons-vue'
 import DebugPanel from '@/components/DebugPanel.vue'
 import GlobalEmpty from '@/components/GlobalEmpty.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { getEnvironments, createEnvironment, updateEnvironment, deleteEnvironment, copyEnvironment, fetchToken as fetchTokenApi, fetchTokenPreview } from '@/api/environment'
 import { confirmDelete } from '@/utils/confirmDelete'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -507,15 +510,13 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-const avatarTextColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarBgColors = ['#e6f4ff', '#f0f5ff', '#e6fffb', '#fff7e6', '#f9f0ff', '#fff0f6', '#e6fffb', '#f6ffed']
-const getAvatarStyle = (id) => {
-  return {
-    background: avatarBgColors[(id || 0) % avatarBgColors.length],
-    color: avatarTextColors[(id || 0) % avatarTextColors.length],
-  }
-}
-const getCreatorAvatarStyle = getAvatarStyle
+const resourceAvatarTextColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
+const resourceAvatarBgColors = ['#e6f4ff', '#f0f5ff', '#e6fffb', '#fff7e6', '#f9f0ff', '#fff0f6', '#e6fffb', '#f6ffed']
+const getResourceAvatarStyle = (id) => ({
+  background: resourceAvatarBgColors[(id || 0) % resourceAvatarBgColors.length],
+  color: resourceAvatarTextColors[(id || 0) % resourceAvatarTextColors.length],
+})
+
 const formatDate = (value) => value ? formatBeijingDate(value) || '-' : '-'
 
 const formData = reactive({
@@ -1343,8 +1344,6 @@ onMounted(() => { loadEnvironments() })
 .env-creator > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta-time { color: #bfbfbf; font-size: 12px; white-space: nowrap; }
 .title-time { flex-shrink: 0; font-weight: 400; }
-.creator-avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; }
 .env-actions { display: flex; align-items: center; gap: 12px; justify-content: flex-end; flex-shrink: 0; }
 .env-actions .el-button + .el-button { margin-left: 0; }
 .env-actions .el-button { min-width: 54px; height: 30px; padding: 6px 11px; border-radius: 6px; }

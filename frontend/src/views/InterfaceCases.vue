@@ -133,10 +133,12 @@
             <span>修改时间：{{ formatCaseTime(tc.updated_at) }}</span>
           </div>
           <div class="card-creator">
-            <span class="card-creator-avatar" :style="tc.created_by_avatar ? {} : { background: creatorAvatarColor(tc.created_by) }">
-              <img v-if="tc.created_by_avatar" :src="tc.created_by_avatar" alt="创建人头像" />
-              <span v-else>{{ creatorInitial(tc.created_by_name) }}</span>
-            </span>
+            <UserAvatar
+              :size="22"
+              :src="tc.created_by_avatar"
+              :name="tc.created_by_name"
+              :user-id="tc.created_by"
+            />
             <span class="card-creator-name">{{ tc.created_by_name || '—' }}</span>
           </div>
           <div class="card-actions">
@@ -246,6 +248,7 @@ import InterfaceWorkflowStatusDialog from '@/components/InterfaceWorkflowStatusD
 import TestCaseEditDialog from '@/components/TestCaseEditDialog.vue'
 import BatchInterfaceCaseGenerationDialog from '@/components/BatchInterfaceCaseGenerationDialog.vue'
 import CollectionSingleSelect from '@/components/CollectionSingleSelect.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { getCollectionTree } from '@/api/collections'
 import { getInterfaces, getInterface, updateInterface } from '@/api/interfaces'
 import { getTestCases, getTestCase, createTestCase, updateTestCase, copyTestCase, deleteTestCase, batchDeleteTestCasesByInterface, batchConfirmTestCases } from '@/api/testcases'
@@ -471,10 +474,6 @@ function priorityLabel(priority) {
   const p = normalizePriority(priority)
   return p === 'high' ? '高' : p === 'low' ? '低' : '中'
 }
-const creatorAvatarColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-function creatorAvatarColor(id) { return creatorAvatarColors[(id || 0) % creatorAvatarColors.length] }
-function creatorInitial(name) { return (name || '?').trim().charAt(0) || '?' }
-
 // 按项目记住上次选择的接口集，刷新后仍停留在原来的接口集下
 const collectionMemoryKey = () => `interface_cases_collection_${projectId.value}`
 function readRememberedCollectionId() {
@@ -1133,8 +1132,6 @@ watch(() => route.params.iid, (v) => {
 .assertion-badge-icon::after { inset: 3px; background: rgba(255, 255, 255, 0.72); }
 .assertion-badge-icon :deep(.el-icon) { position: relative; z-index: 1; }
 .card-creator { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 10px; font-size: 12px; color: #606266; }
-.card-creator-avatar { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; overflow: hidden; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 600; }
-.card-creator-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .card-creator-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-times { display: grid; gap: 4px; margin-bottom: 12px; font-size: 12px; color: #909399; line-height: 1.4; }
 .card-actions { display: flex; gap: 4px; padding-top: 12px; flex-wrap: wrap; }

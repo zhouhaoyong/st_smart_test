@@ -40,10 +40,12 @@
       <FeedbackReminder />
       <el-dropdown trigger="click" @command="handleCommand">
         <div class="user-info">
-          <div class="user-avatar" :style="userStore.userInfo?.avatar ? {} : { background: avatarBgColor, color: '#fff' }">
-            <img v-if="userStore.userInfo?.avatar" :src="userStore.userInfo.avatar" class="avatar-img" />
-            <span v-else>{{ userAvatarLetter }}</span>
-          </div>
+          <UserAvatar
+            :size="32"
+            :src="userStore.userInfo?.avatar"
+            :name="userStore.userInfo?.real_name"
+            :user-id="userStore.userInfo?.id"
+          />
           <span>{{ userStore.userInfo?.real_name || '用户' }}</span>
           <el-icon :size="14"><ArrowDown /></el-icon>
         </div>
@@ -63,6 +65,7 @@ import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import FeedbackReminder from '@/components/FeedbackReminder.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { ElMessageBox } from 'element-plus'
 import { Setting, SwitchButton, VideoPlay, ArrowDown, User, Location, Postcard, Tickets } from '@element-plus/icons-vue'
 
@@ -89,16 +92,6 @@ const handleCommand = (cmd) => {
   }
 }
 
-const userAvatarLetter = computed(() => {
-  const name = userStore.userInfo?.real_name
-  return name ? name.charAt(0).toUpperCase() : '用'
-})
-
-const avatarBgColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarBgColor = computed(() => {
-  const userId = userStore.userInfo?.id || 0
-  return avatarBgColors[userId % avatarBgColors.length]
-})
 </script>
 
 <style scoped>
@@ -122,13 +115,10 @@ const avatarBgColor = computed(() => {
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 15px; padding: 4px 6px; border-radius: 8px; }
 .user-info:hover { background: #f5f5f5; }
-.user-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; }
-
 @media (max-width: 1600px) {
   .topbar { padding: 0 20px; }
   .topbar-brand { margin-right: 20px; }
-  .topbar-tab { padding: 8px 14px; font-size: 15px; }
+  .topbar-tab { padding: 8px 14px; font-size: 16px; }
 }
 @media (max-width: 1200px) {
   .topbar-nav { gap: 2px; }

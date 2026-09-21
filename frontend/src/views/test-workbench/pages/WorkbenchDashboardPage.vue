@@ -1,7 +1,7 @@
 <template>
   <section class="dashboard-page">
     <WorkbenchPageHeader title="数据看板">
-      <template v-if="isSuperAdmin" #actions>
+      <template v-if="canClearProjectData" #actions>
         <el-button type="danger" plain :loading="clearing" @click="handleClearBusinessData">清空项目数据</el-button>
       </template>
     </WorkbenchPageHeader>
@@ -20,7 +20,7 @@
       </el-steps>
 
       <section v-if="cleanupDialog.step === 0" class="cleanup-dialog-content">
-        <p class="cleanup-dialog__hint">仅超级管理员可操作。请选择需要清理数据的系统，确认后会写入审计记录。</p>
+        <p class="cleanup-dialog__hint">超级管理员或私有项目创建人可操作。请选择需要清理数据的系统，确认后会写入审计记录。</p>
         <div class="cleanup-selection-bar">
           <el-checkbox v-model="allCleanupSystemsSelected" :disabled="!systems.length">全部系统</el-checkbox>
           <span>已选 {{ cleanupDialog.systemIds.length }}/{{ systems.length }} 个系统</span>
@@ -93,13 +93,20 @@ import WorkbenchAssetListDialog from '@/views/test-workbench/components/Workbenc
 import WorkbenchPageHeader from '@/views/test-workbench/components/WorkbenchPageHeader.vue'
 import WorkbenchStatCard from '@/views/test-workbench/components/WorkbenchStatCard.vue'
 
-const { dashboardStats, refreshDashboardStats, refreshScopeOptions, scope, systems } = inject('workbenchContext')
+const { dashboardStats, refreshDashboardStats, refreshScopeOptions, scope, selectedProject, systems } = inject('workbenchContext')
 const route = useRoute()
 const userStore = useUserStore()
 const projectId = computed(() => Number(route.params.id))
 const assetDialog = reactive({ visible: false, assetType: 'system', status: '' })
 const clearing = ref(false)
 const isSuperAdmin = computed(() => Boolean(userStore.userInfo?.is_superuser))
+const canClearProjectData = computed(() => Boolean(
+  isSuperAdmin.value
+  || (
+    selectedProject.value?.created_by === userStore.userInfo?.id
+    && !selectedProject.value?.is_public
+  )
+))
 const cleanupTypes = ['system', 'version', 'requirement', 'test_case', 'bug', 'legacy_item']
 const cleanupChildTypes = ['requirement', 'test_case', 'bug', 'legacy_item']
 const cleanupDialog = reactive({ visible: false, step: 0, loading: false, systemIds: [], assetTypes: [], summary: {} })

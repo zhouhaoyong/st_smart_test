@@ -6,10 +6,7 @@
 
     <template v-if="userInfo">
       <div class="user-card">
-        <div class="user-avatar" :style="userInfo.avatar ? {} : { background: avatarColor }">
-          <img v-if="userInfo.avatar" :src="userInfo.avatar" :alt="`${userInfo.real_name || '用户'}头像`" />
-          <span v-else>{{ userInfo.real_name?.charAt(0) || '?' }}</span>
-        </div>
+        <UserAvatar :size="48" :src="userInfo.avatar" :name="userInfo.real_name" :user-id="userInfo.id || userId" />
         <div class="user-meta">
           <h2>{{ userInfo.real_name || '未知用户' }}</h2>
           <p>{{ userInfo.phone || '—' }} · 用户 ID: {{ userId }}</p>
@@ -81,6 +78,7 @@ import { getAiUsageLogs } from '@/api/ai'
 import { buildAiUsageLogParams } from '@/utils/aiUsageFilters'
 import { resolveAiFunctionLabel } from '@/utils/aiUsageLabels'
 import { formatBeijingMinute } from '@/utils/beijingTime'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,9 +91,6 @@ const logs = ref([])
 const total = ref(0)
 const logPage = ref(1)
 const logPageSize = ref(20)
-
-const avatarColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarColor = computed(() => avatarColors[(userId.value || 0) % avatarColors.length])
 
 const lastCallTime = computed(() => {
   if (logs.value.length) return shortTime(logs.value[0].created_at)
@@ -183,8 +178,6 @@ onMounted(loadData)
   padding: 20px; border: 1px solid #edf1f7; border-radius: 8px; background: #fff;
   margin-bottom: 16px; flex-shrink: 0; flex-wrap: wrap;
 }
-.user-avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #fff; flex-shrink: 0; overflow: hidden; }
-.user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .user-meta { flex: 1; min-width: 160px; }
 .user-meta h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: #1a1a1a; }
 .user-meta p { margin: 0; font-size: 13px; color: #8c8c8c; }

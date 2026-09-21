@@ -58,17 +58,11 @@
           <el-table-column label="操作用户" width="180">
             <template #default="{ row }">
               <el-button v-if="row.user_id" link type="primary" class="user-cell user-link" @click.stop="openUserDetail(row.user_id)">
-                <span class="user-avatar-sm" :style="row.user_avatar ? {} : { background: avatarColor(row.user_id) }">
-                  <img v-if="row.user_avatar" :src="row.user_avatar" :alt="`${row.user_name || '操作用户'}头像`" />
-                  <span v-else>{{ row.user_name?.charAt(0) || '?' }}</span>
-                </span>
+                <UserAvatar :size="22" :src="row.user_avatar" :name="row.user_name" :user-id="row.user_id" />
                 <span class="user-name-text">{{ row.user_name || '-' }}</span>
               </el-button>
               <div v-else class="user-cell">
-                <span class="user-avatar-sm" :style="row.user_avatar ? {} : { background: avatarColor(row.user_id) }">
-                  <img v-if="row.user_avatar" :src="row.user_avatar" :alt="`${row.user_name || '操作用户'}头像`" />
-                  <span v-else>{{ row.user_name?.charAt(0) || '?' }}</span>
-                </span>
+                <UserAvatar :size="22" :src="row.user_avatar" :name="row.user_name" :user-id="row.user_id" />
                 <span class="user-name-text">{{ row.user_name || '-' }}</span>
               </div>
             </template>
@@ -136,6 +130,7 @@ import {
   operationTag,
 } from '@/utils/auditContent'
 import UserDialog from '@/components/UserDialog.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const loading = ref(false)
 const logList = ref([])
@@ -176,9 +171,6 @@ const appliedSearchForm = ref(cloneSearchForm(searchForm))
 const appliedSearchKey = ref(serializeSearchForm(appliedSearchForm.value))
 const filtersDirty = computed(() => serializeSearchForm(searchForm) !== appliedSearchKey.value)
 const canDeleteAll = computed(() => isSuperAdmin.value && hasLoaded.value && !filtersDirty.value && total.value > 0)
-
-const avatarColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarColor = (id) => avatarColors[(id || 0) % avatarColors.length]
 
 const fullTime = (d) => d ? formatBeijingTime(d) : '-'
 const openUserDetail = (userId) => {
@@ -313,14 +305,7 @@ onMounted(() => { loadAuditLogs(); loadUsers() })
 
 .user-cell { display: flex; align-items: center; }
 .user-link { width: 100%; justify-content: flex-start; margin: 0; padding: 0; overflow: hidden; }
-.user-avatar-sm {
-  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  margin-right: 10px;
-  font-size: 11px; font-weight: 700; color: #fff;
-  overflow: hidden;
-}
-.user-avatar-sm img { width: 100%; height: 100%; object-fit: cover; }
+.user-cell :deep(.user-avatar) { margin-right: 10px; }
 .user-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .content-text { color: #303133; }
 .ip-text { font-family: SFMono-Regular, Consolas, monospace; color: #8c8c8c; font-size: 12px; }

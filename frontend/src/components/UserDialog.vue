@@ -2,10 +2,7 @@
   <el-dialog v-model="visible" :title="isEdit ? '编辑用户' : '用户详情'" width="560px" destroy-on-close @closed="onClosed">
     <div v-loading="loading">
       <div class="ud-header" v-if="user">
-        <div class="ud-avatar" :style="user.avatar ? {} : { background: avatarColor }">
-          <img v-if="user.avatar" :src="user.avatar" :alt="`${user.real_name || '用户'}头像`" />
-          <span v-else>{{ user.real_name?.charAt(0) || '?' }}</span>
-        </div>
+        <UserAvatar :size="44" :src="user.avatar" :name="user.real_name" :user-id="user.id || props.userId" />
         <div class="ud-names">
           <strong>{{ user.real_name || '—' }}</strong>
           <span>ID: {{ user.id }}</span>
@@ -78,6 +75,7 @@
 import { ref, watch, computed } from 'vue'
 import { getUser, updateUser } from '@/api/user'
 import { formatBeijingMinute } from '@/utils/beijingTime'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -97,9 +95,6 @@ const loading = ref(false)
 const saving = ref(false)
 const user = ref(null)
 const form = ref({})
-
-const avatarColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2']
-const avatarColor = computed(() => avatarColors[(props.userId || 0) % avatarColors.length])
 
 const departmentOptions = [
   { value: 1, label: '测试部门' },
@@ -158,8 +153,6 @@ watch(visible, (v) => { if (v && props.userId) loadUser() })
 
 <style scoped>
 .ud-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #f0f0f0; }
-.ud-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; overflow: hidden; }
-.ud-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .ud-names { display: flex; flex-direction: column; gap: 2px; }
 .ud-names strong { font-size: 16px; color: #1a1a1a; }
 .ud-names span { font-size: 12px; color: #8c8c8c; }

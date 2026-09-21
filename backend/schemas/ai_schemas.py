@@ -111,4 +111,4 @@ class AiModelQuotaRequest(BaseModel):
 
 
 class AiPlatformQuotaSettingRequest(BaseModel):
-    daily_limit: int = Field(gt=0)
+    daily_limit: int = Field(ge=0)

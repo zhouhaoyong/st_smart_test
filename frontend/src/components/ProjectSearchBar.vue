@@ -5,15 +5,15 @@
       :placeholder="placeholder"
       :prefix-icon="Search"
       clearable
-      size="large"
+      size="default"
       class="search-input"
       @update:modelValue="$emit('update:modelValue', $event)"
       @input="$emit('input', $event)"
       @clear="$emit('clear')"
       @keyup.enter="$emit('search')"
     />
-    <el-button type="primary" :icon="Search" size="large" :loading="loading" @click="$emit('search')">搜索</el-button>
-    <el-button v-if="showCreate" type="primary" size="large" :icon="Plus" @click="$emit('create')">{{ createText }}</el-button>
+    <el-button type="primary" :icon="Search" size="default" :loading="loading" @click="$emit('search')">搜索</el-button>
+    <el-button v-if="showCreate" type="primary" size="default" :icon="Plus" @click="$emit('create')">{{ createText }}</el-button>
     <slot name="actions" />
   </div>
 </template>
@@ -33,7 +33,15 @@ defineEmits(['update:modelValue', 'input', 'search', 'clear', 'create'])
 </script>
 
 <style scoped>
-.search-bar { margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.search-bar {
+  --el-component-size: 36px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.search-bar :deep(.el-input__wrapper),
+.search-bar :deep(.el-button) { height: 36px; }
 .search-input { width: 360px; }
 @media (max-width: 720px) {
   .search-bar { align-items: stretch; flex-direction: column; }

@@ -44,6 +44,15 @@ def get_valid_quota_limit(value: int | None) -> int | None:
     return limit if limit and limit > 0 else None
 
 
+def get_configured_quota_limit(value: int | None) -> int | None:
+    """读取额度配置展示值；允许 0 表示已配置但暂停非超管使用。"""
+    try:
+        limit = int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+    return limit if limit is not None and limit >= 0 else None
+
+
 @dataclass(frozen=True)
 class UsageFilters:
     user_name: str | None = None
@@ -325,8 +334,8 @@ async def get_platform_quota_setting(db: AsyncSession) -> AiPlatformQuotaSetting
 async def set_platform_quota_setting(
     db: AsyncSession, daily_limit: int, updated_by: int,
 ) -> AiPlatformQuotaSetting:
-    if int(daily_limit) <= 0:
-        raise UnifiedException(code=400, message="平台模型日额度必须大于 0")
+    if int(daily_limit) < 0:
+        raise UnifiedException(code=400, message="平台模型日额度不能小于 0")
     setting = await get_platform_quota_setting(db)
     if setting is None:
         setting = AiPlatformQuotaSetting(daily_limit=daily_limit, updated_by=updated_by)
@@ -364,7 +373,7 @@ async def get_user_platform_quota_info(db: AsyncSession, user_id: int) -> dict[s
     is_superuser = bool((await db.execute(
         select(User.is_superuser).where(User.id == user_id)
     )).scalar_one_or_none())
-    daily_limit = -1 if is_superuser else get_valid_quota_limit(setting.daily_limit if setting else None)
+    daily_limit = -1 if is_superuser else get_configured_quota_limit(setting.daily_limit if setting else None)
     today_used = await get_platform_model_usage(db, user_id)
     return {
         "daily_limit": daily_limit,
@@ -381,7 +390,7 @@ async def get_users_platform_quota_info(db: AsyncSession, user_ids: set[int]) ->
     if not normalized_ids:
         return {}
     setting = await get_platform_quota_setting(db)
-    daily_limit = get_valid_quota_limit(setting.daily_limit if setting else None)
+    daily_limit = get_configured_quota_limit(setting.daily_limit if setting else None)
     today_start, today_end = _today_bounds()
     usage_rows = await db.execute(
         select(AiUsageLog.user_id, func.count(AiUsageLog.id))
@@ -658,7 +667,7 @@ async def list_users_with_quota_info(
 
     # 全平台统一额度：每个非超管成员每日额度都等于平台模型额度配置。
     platform_setting = await get_platform_quota_setting(db)
-    default_limit = get_valid_quota_limit(platform_setting.daily_limit if platform_setting else None)
+    default_limit = get_configured_quota_limit(platform_setting.daily_limit if platform_setting else None)
 
     # 平台模型“已用”只统计实际消费调用，避免我的模型和未消费拒绝混入。
     today_start, today_end = _today_bounds()
@@ -785,7 +794,7 @@ async def get_usage_summary(
     logs = result.all()
 
     platform_setting = await get_platform_quota_setting(db)
-    platform_daily_limit = get_valid_quota_limit(platform_setting.daily_limit if platform_setting else None)
+    platform_daily_limit = get_configured_quota_limit(platform_setting.daily_limit if platform_setting else None)
     personal_quota_map = {}
     user_ids = {log.user_id for log, *_ in logs if log.user_id is not None}
     model_ids = {log.model_id for log, *_ in logs if log.model_id is not None}

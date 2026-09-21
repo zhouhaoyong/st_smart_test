@@ -20,10 +20,12 @@
                   class="avatar-upload-wrap"
                 >
                   <div class="avatar-preview">
-                    <img v-if="profileForm.avatar" :src="profileForm.avatar" class="avatar-img-round" />
-                    <div v-else class="avatar-letter" :style="{ background: avatarBgColor, color: '#fff' }">
-                      {{ avatarLetter }}
-                    </div>
+                    <UserAvatar
+                      :size="100"
+                      :src="profileForm.avatar"
+                      :name="profileForm.real_name"
+                      :user-id="userStore.userInfo?.id"
+                    />
                     <div class="avatar-overlay">
                       <el-icon :size="22"><Camera /></el-icon>
                       <span>更换头像</span>
@@ -113,6 +115,7 @@ import request from '@/utils/request'
 import { formatBeijingMinute } from '@/utils/beijingTime'
 import { getProfile, updateProfile, changePassword } from '@/api/user'
 import { useUserStore } from '@/stores/user'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const userStore = useUserStore()
 const activeTab = ref('info')
@@ -125,19 +128,6 @@ const profileForm = reactive({
 const roleLabels = { super_admin: '超级管理员', manager: '管理员', user: '普通用户' }
 const roleLabel = computed(() => roleLabels[profileForm.role] || '普通用户')
 const roleTagType = computed(() => ({ super_admin: 'primary', manager: 'warning', user: 'success' }[profileForm.role] || 'success'))
-
-// 用户头像：根据真实姓名首字母生成
-const avatarLetter = computed(() => {
-  const name = profileForm.real_name
-  return name ? name.charAt(0).toUpperCase() : '用'
-})
-
-// 头像背景色：根据用户ID生成固定颜色（与其他地方保持一致）
-const avatarBgColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarBgColor = computed(() => {
-  const userId = userStore.userInfo?.id || 0
-  return avatarBgColors[userId % avatarBgColors.length]
-})
 
 const pwdForm = reactive({ old_password: '', new_password: '', confirm_password: '' })
 const pwdFormRef = ref(null)
@@ -375,8 +365,6 @@ onMounted(() => {
   width: 100px; height: 100px; border-radius: 50%; overflow: hidden; cursor: pointer;
   position: relative; flex-shrink: 0; border: 3px solid #f0f0f0;
 }
-.avatar-img-round { width: 100%; height: 100%; object-fit: cover; }
-.avatar-letter { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: 700; }
 .avatar-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,0.45);
   display: flex; flex-direction: column; align-items: center; justify-content: center;

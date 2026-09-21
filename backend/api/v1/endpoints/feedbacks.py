@@ -1,5 +1,5 @@
 """
-问题反馈 API — 提交、查看、回复、解决
+问题反馈 API — 提交、查看、回复、解决、删除
 """
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, UploadFile, File, Query
@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 from db.session import get_db
 from models.models import Feedback, User
-from core.security import get_current_active_user, check_manager_permission
+from core.security import get_current_active_user, check_super_admin_permission
 from core.response import success_response, UnifiedException
 from utils.oss_client import extract_file_reference, resolve_file_url
 from utils.audit_logger import log_user_operation
@@ -87,6 +87,7 @@ async def create_feedback(data: FeedbackCreate, current_user=Depends(get_current
         interaction_logs=[{
             "type": "submit",
             "content": data.content,
+            "page_url": data.page_url,
             "user_id": current_user.id,
             "user_name": current_user.real_name,
             "created_at": _iso(_now()),
@@ -125,20 +126,17 @@ async def list_feedbacks(
     current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    is_admin = current_user.is_superuser or current_user.is_manager
+    is_super_admin = current_user.is_superuser
     q = select(Feedback).options(
         joinedload(Feedback.user), joinedload(Feedback.resolver)
     ).where(Feedback.is_deleted == False)
     count_q = select(func.count()).select_from(Feedback).where(Feedback.is_deleted == False)
 
-    if not is_admin or mine_only or scope == "my":
+    if not is_super_admin or mine_only or scope == "my":
         q = q.where(Feedback.user_id == current_user.id)
         count_q = count_q.where(Feedback.user_id == current_user.id)
     elif scope == "todo":
-        todo_filters = (
-            Feedback.user_id != current_user.id,
-            Feedback.status.notin_(FINISHED_STATUSES),
-        )
+        todo_filters = (Feedback.status.notin_(FINISHED_STATUSES),)
         q = q.where(*todo_filters)
         count_q = count_q.where(*todo_filters)
     elif scope == "all":
@@ -180,14 +178,14 @@ async def list_feedbacks(
 
 @router.get("/reminders")
 async def feedback_reminders(current_user=Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
-    is_admin = current_user.is_superuser or current_user.is_manager
+    is_super_admin = current_user.is_superuser
     pending_count = 0
-    if is_admin:
+    todo_count = 0
+    if is_super_admin:
         r = await db.execute(
             select(func.count()).select_from(Feedback).where(
                 Feedback.is_deleted == False,
                 Feedback.status == "pending",
-                Feedback.user_id != current_user.id,
                 or_(
                     Feedback.resolved_by.is_(None),
                     Feedback.resolved_by != current_user.id,
@@ -197,11 +195,35 @@ async def feedback_reminders(current_user=Depends(get_current_active_user), db: 
         )
         pending_count = r.scalar() or 0
 
+        r = await db.execute(
+            select(func.count()).select_from(Feedback).where(
+                Feedback.is_deleted == False,
+                Feedback.status.notin_(FINISHED_STATUSES),
+            )
+        )
+        todo_count = r.scalar() or 0
+
     r = await db.execute(
         select(func.count()).select_from(Feedback).where(
             Feedback.is_deleted == False,
             Feedback.user_id == current_user.id,
-            Feedback.status.in_(["processing", "pending_confirm"]),
+            or_(
+                and_(
+                    Feedback.status.in_(["processing", "pending_confirm"]),
+                    Feedback.admin_reply.isnot(None),
+                    Feedback.reply_read_at.is_(None),
+                ),
+                Feedback.status == "pending_confirm",
+            ),
+        )
+    )
+    my_attention_count = r.scalar() or 0
+
+    r = await db.execute(
+        select(func.count()).select_from(Feedback).where(
+            Feedback.is_deleted == False,
+            Feedback.user_id == current_user.id,
+            Feedback.status == "processing",
             Feedback.admin_reply.isnot(None),
             Feedback.reply_read_at.is_(None),
         )
@@ -209,11 +231,10 @@ async def feedback_reminders(current_user=Depends(get_current_active_user), db: 
     unread_reply_count = r.scalar() or 0
 
     reopened_count = 0
-    if is_admin:
+    if is_super_admin:
         r = await db.execute(
             select(func.count()).select_from(Feedback).where(
                 Feedback.is_deleted == False,
-                Feedback.user_id != current_user.id,
                 Feedback.status == "pending",
                 Feedback.resolved_by == current_user.id,
                 Feedback.reopen_read_at.is_(None),
@@ -229,13 +250,40 @@ async def feedback_reminders(current_user=Depends(get_current_active_user), db: 
         )
     )
     pending_confirm_count = r.scalar() or 0
+
+    reminder_q = select(Feedback).options(
+        joinedload(Feedback.user), joinedload(Feedback.resolver)
+    ).where(Feedback.is_deleted == False)
+    if is_super_admin:
+        reminder_q = reminder_q.where(Feedback.status.notin_(FINISHED_STATUSES))
+    else:
+        reminder_q = reminder_q.where(
+            Feedback.user_id == current_user.id,
+            or_(
+                Feedback.status == "pending_confirm",
+                and_(
+                    Feedback.status == "processing",
+                    Feedback.admin_reply.isnot(None),
+                    Feedback.reply_read_at.is_(None),
+                ),
+            ),
+        )
+    reminder_q = reminder_q.order_by(Feedback.updated_at.desc(), Feedback.created_at.desc())
+    reminder_result = await db.execute(reminder_q)
+    reminder_items = [
+        _format_reminder(fb, current_user)
+        for fb in reminder_result.unique().scalars().all()
+    ]
     return success_response(data={
         "pending_count": pending_count,
+        "todo_count": todo_count,
         "unread_reply_count": unread_reply_count,
         "unread_resolved_count": unread_reply_count,
         "reopened_count": reopened_count,
         "pending_confirm_count": pending_confirm_count,
-        "total": pending_count + unread_reply_count + reopened_count + pending_confirm_count,
+        "my_attention_count": my_attention_count,
+        "total": todo_count if is_super_admin else my_attention_count,
+        "items": reminder_items,
     })
 
 
@@ -248,14 +296,14 @@ async def get_feedback(id: int, current_user=Depends(get_current_active_user), d
     fb = r.unique().scalar_one_or_none()
     if not fb:
         raise UnifiedException(code=404, message="反馈不存在")
-    is_admin = current_user.is_superuser or current_user.is_manager
-    if not is_admin and fb.user_id != current_user.id and fb.resolved_by != current_user.id:
+    is_super_admin = current_user.is_superuser
+    if not is_super_admin and fb.user_id != current_user.id:
         raise UnifiedException(code=403, message="权限不足")
     data = _format_feedback(fb)
     if fb.user_id == current_user.id and fb.status in ("processing", "pending_confirm") and fb.admin_reply and fb.reply_read_at is None:
         fb.reply_read_at = _now()
         await db.commit()
-    elif is_admin and fb.resolved_by == current_user.id and fb.user_id != current_user.id and fb.status == "pending" and fb.reopen_read_at is None:
+    elif is_super_admin and fb.resolved_by == current_user.id and fb.user_id != current_user.id and fb.status == "pending" and fb.reopen_read_at is None:
         fb.reopen_read_at = _now()
         await db.commit()
     return success_response(data=data)
@@ -272,9 +320,9 @@ async def reply_feedback(id: int, data: ReplyInput, current_user=Depends(get_cur
         raise UnifiedException(code=404, message="反馈不存在")
     if fb.status in FINISHED_STATUSES:
         raise UnifiedException(code=400, message="已完成的反馈不能继续回复")
-    is_admin = current_user.is_superuser or current_user.is_manager
+    is_super_admin = current_user.is_superuser
     is_owner = fb.user_id == current_user.id
-    if not is_admin and not is_owner:
+    if not is_super_admin and not is_owner:
         raise UnifiedException(code=403, message="权限不足")
     if fb.status == "pending_confirm":
         if is_owner:
@@ -319,7 +367,7 @@ async def reply_feedback(id: int, data: ReplyInput, current_user=Depends(get_cur
 
 
 @router.put("/{id}/resolve")
-async def resolve_feedback(id: int, data: ResolveInput, current_user=Depends(check_manager_permission), db: AsyncSession = Depends(get_db)):
+async def resolve_feedback(id: int, data: ResolveInput, current_user=Depends(check_super_admin_permission), db: AsyncSession = Depends(get_db)):
     r = await db.execute(
         select(Feedback).options(joinedload(Feedback.user), joinedload(Feedback.resolver))
         .where(Feedback.id == id, Feedback.is_deleted == False)
@@ -334,13 +382,14 @@ async def resolve_feedback(id: int, data: ResolveInput, current_user=Depends(che
     reply = (data.admin_reply or "").strip()
     if not reply:
         raise UnifiedException(code=400, message="标记已解决时必须填写回复内容")
-    fb.status = "pending_confirm"
+    next_status = "completed" if fb.user_id == current_user.id else "pending_confirm"
+    fb.status = next_status
     fb.resolved_by = current_user.id
     fb.resolved_at = _now()
     fb.admin_reply = reply
-    fb.reply_read_at = None
+    fb.reply_read_at = _now() if next_status == "completed" else None
     fb.reopen_read_at = _now()
-    _append_interaction(fb, "resolve", reply, current_user, status="pending_confirm")
+    _append_interaction(fb, "resolve", reply, current_user, status=next_status)
     result = _format_feedback(fb)
     result["resolver_name"] = current_user.real_name
     await db.commit()
@@ -353,7 +402,8 @@ async def resolve_feedback(id: int, data: ResolveInput, current_user=Depends(che
         target_name=fb.title,
         description="处理并解决问题反馈",
     )
-    return success_response(data=result, message="处理结果已提交，等待提出人确认")
+    message = "反馈已解决" if next_status == "completed" else "处理结果已提交，等待提出人确认"
+    return success_response(data=result, message=message)
 
 
 @router.put("/{id}/confirm-close")
@@ -425,8 +475,7 @@ async def delete_feedback(id: int, current_user=Depends(get_current_active_user)
     fb = r.scalar_one_or_none()
     if not fb:
         raise UnifiedException(code=404, message="反馈不存在")
-    is_admin = current_user.is_superuser or current_user.is_manager
-    if not is_admin and fb.user_id != current_user.id:
+    if not current_user.is_superuser and fb.user_id != current_user.id:
         raise UnifiedException(code=403, message="权限不足")
     feedback_title = fb.title
     fb.is_deleted = True; fb.deleted_at = _now()
@@ -467,6 +516,26 @@ def _format_feedback(fb: Feedback) -> dict:
     }
 
 
+def _format_reminder(fb: Feedback, current_user) -> dict:
+    data = _format_feedback(fb)
+    if current_user.is_superuser:
+        if fb.status == "pending" and fb.resolved_by == current_user.id and fb.reopen_read_at is None:
+            reminder_type, reminder_label = "reopened", "重新打开"
+        elif fb.status == "pending":
+            reminder_type, reminder_label = "pending", "待处理"
+        elif fb.status == "pending_confirm":
+            reminder_type, reminder_label = "pending_confirm", "待确认"
+        else:
+            reminder_type, reminder_label = "processing", "处理中"
+    elif fb.status == "pending_confirm":
+        reminder_type, reminder_label = "pending_confirm", "待确认"
+    else:
+        reminder_type, reminder_label = "unread_reply", "新回复"
+    data["reminder_type"] = reminder_type
+    data["reminder_label"] = reminder_label
+    return data
+
+
 def _append_interaction(fb: Feedback, action: str, content: str, user, status: str | None = None) -> None:
     logs = list(fb.interaction_logs or [])
     logs.append({
@@ -486,6 +555,7 @@ def _format_interactions(fb: Feedback) -> list[dict]:
         logs.append({
             "type": "submit",
             "content": fb.content,
+            "page_url": fb.page_url,
             "user_id": fb.user_id,
             "user_name": fb.user.real_name if fb.user else None,
             "created_at": _iso(fb.created_at),
@@ -499,4 +569,6 @@ def _format_interactions(fb: Feedback) -> list[dict]:
                 "user_name": fb.resolver.real_name if fb.resolver else None,
                 "created_at": _iso(fb.resolved_at),
             })
+    elif logs and logs[0].get("type") == "submit" and fb.page_url and not logs[0].get("page_url"):
+        logs[0] = {**logs[0], "page_url": fb.page_url}
     return logs

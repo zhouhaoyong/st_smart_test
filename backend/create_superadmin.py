@@ -20,6 +20,7 @@ from models.models import User
 from core.security import get_password_hash
 from core.permissions import normalize_role_flags
 from core.user_validation import validate_password, validate_phone, validate_real_name
+from utils.avatar import create_default_avatar
 
 _engine = create_async_engine(settings.DATABASE_URL, echo=False)
 _AsyncSessionLocal = sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
@@ -44,6 +45,8 @@ async def create_superadmin(phone: str, password: str, real_name: str = "超级�
             if existing.is_deleted:
                 print(f"错误: 手机号 {phone} 已被删除账号占用，请更换手机号")
                 sys.exit(1)
+            if not existing.avatar:
+                existing.avatar = create_default_avatar(existing.id, existing.real_name)
             if existing.is_superuser:
                 _, existing.is_manager = normalize_role_flags(
                     existing.is_superuser,
@@ -79,6 +82,8 @@ async def create_superadmin(phone: str, password: str, real_name: str = "超级�
         )
         db.add(user)
         try:
+            await db.flush()
+            user.avatar = create_default_avatar(user.id, user.real_name)
             await db.commit()
         except IntegrityError as e:
             msg = str(e).lower()

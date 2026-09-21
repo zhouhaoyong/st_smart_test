@@ -66,10 +66,7 @@
                     {{ sourceLabel(log.source) }}
                   </el-tag>
                   <span class="log-operator">
-                    <img v-if="log.user_avatar" :src="log.user_avatar" alt="操作人头像" class="log-operator-avatar" />
-                    <span v-else class="log-operator-avatar log-operator-avatar--fallback">
-                      {{ log.user_name?.charAt(0) || '?' }}
-                    </span>
+                    <UserAvatar :size="18" :src="log.user_avatar" :name="log.user_name" :user-id="log.user_id" />
                     <span class="log-operator-name">{{ log.user_name || '未知用户' }}</span>
                   </span>
                 </div>
@@ -227,6 +224,7 @@ import { computed, ref, watch } from 'vue'
 import { getInterfaceImportLogs, getInterfaceImportLogItems, getInterfaceImportLogOperators } from '@/api/interfaces'
 import { formatBeijingTime } from '@/utils/beijingTime'
 import GlobalEmpty from '@/components/GlobalEmpty.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -665,8 +663,6 @@ watch(() => props.projectId, () => {
 .log-title-line { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .log-title-line strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--el-text-color-primary); }
 .log-operator { display: inline-flex; align-items: center; gap: 5px; color: var(--el-text-color-secondary); font-size: 12px; }
-.log-operator-avatar { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 50%; object-fit: cover; }
-.log-operator-avatar--fallback { display: inline-flex; align-items: center; justify-content: center; background: var(--el-color-primary); color: #fff; font-size: 11px; line-height: 18px; }
 .log-operator-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .log-source-name { margin-top: 8px; color: var(--el-text-color-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .log-summary { margin-top: 8px; color: var(--el-text-color-primary); font-size: 13px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

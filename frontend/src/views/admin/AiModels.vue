@@ -10,19 +10,21 @@
         </el-tabs>
         <div v-if="isPlatformTab" class="platform-quota-summary" role="status">
           <span class="platform-quota-title">平台模型额度</span>
-          <span v-if="isSuperuser" class="platform-quota-item"><span>普通用户每日</span><strong>{{ platformQuotaLimitLabel }}</strong></span>
-          <span v-else class="platform-quota-item"><span>每日</span><strong>{{ platformQuotaLabel }}</strong></span>
-          <span v-if="isSuperuser" class="platform-quota-item"><span>超管</span><strong>不受限制</strong></span>
-          <span v-else class="platform-quota-item"><span>今日已用</span><strong>{{ platformQuota.today_used || 0 }} 次</strong></span>
-          <span
-            v-if="!isSuperuser"
-            class="platform-quota-item platform-quota-remaining"
-            :class="{ 'is-low': platformQuota.quota > 0 && Number(platformQuota.remaining || 0) <= 1, 'is-empty': platformQuota.quota > 0 && Number(platformQuota.remaining || 0) <= 0 }"
-          >
-            <span>剩余</span><strong>{{ platformQuotaRemainingLabel }}</strong>
-          </span>
-          <span v-if="isSuperuser && !hasAvailablePlatformModel" class="platform-quota-warning">当前无可用平台模型，额度暂不生效</span>
-          <el-button v-if="isSuperuser" link type="primary" @click="openPlatformQuotaDialog">设置额度</el-button>
+          <template v-if="isSuperuser">
+            <span v-if="platformQuotaSettingConfigured" class="platform-quota-item"><span>每日限额：</span><strong>{{ platformQuotaSetting.daily_limit }} 次</strong></span>
+            <span v-else-if="platformQuotaSettingQueryFailed" class="platform-quota-item"><strong>查询失败</strong></span>
+          </template>
+          <template v-else-if="platformQuotaConfigured">
+            <span class="platform-quota-item"><span>每日限额：</span><strong>{{ platformQuota.quota }} 次</strong></span>
+            <span class="platform-quota-item"><span>今日已用：</span><strong>{{ platformQuota.today_used || 0 }} 次</strong></span>
+          </template>
+          <span v-else class="platform-quota-item"><strong>{{ platformQuotaQueryFailed ? '查询失败' : '暂未配置' }}</strong></span>
+          <el-tooltip v-if="isSuperuser && !hasAvailablePlatformModel" content="请先启用至少一个平台模型" placement="top">
+            <span class="platform-quota-action-disabled">
+              <el-button link type="primary" disabled>{{ platformQuotaActionLabel }}</el-button>
+            </span>
+          </el-tooltip>
+          <el-button v-else-if="isSuperuser" link type="primary" @click="openPlatformQuotaDialog">{{ platformQuotaActionLabel }}</el-button>
         </div>
       </div>
       <div class="list-toolbar">
@@ -67,10 +69,7 @@
         <el-table-column v-if="isUserModelsTab" label="模型使用人" width="160" show-overflow-tooltip>
           <template #default="{ row }">
             <el-button v-if="row.owner_user_id" link type="primary" class="user-cell user-link" @click="openUserDetail(row)">
-              <span class="user-avatar-sm" :style="row.owner_avatar ? {} : { background: avatarColor(row.owner_user_id) }">
-                <img v-if="row.owner_avatar" :src="row.owner_avatar" :alt="`${row.owner_name || '模型使用人'}头像`" />
-                <span v-else>{{ row.owner_name?.charAt(0) || '?' }}</span>
-              </span>
+              <UserAvatar :size="22" :src="row.owner_avatar" :name="row.owner_name" :user-id="row.owner_user_id" />
               <span class="user-name-text">{{ row.owner_name || '未知用户' }}</span>
             </el-button>
             <span v-else>—</span>
@@ -273,11 +272,11 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="platformQuotaVisible" title="设置平台模型日额度" width="440px" append-to-body>
-      <p class="platform-setting__hint">所有普通用户按统一日额度独立计数；额度大于 0 且存在可用平台模型时才可使用。</p>
-      <el-form label-width="92px">
+    <el-dialog v-model="platformQuotaVisible" title="设置平台模型额度" width="440px" append-to-body>
+      <p class="platform-setting__hint">该额度用于限制非超管用户使用平台模型；超管不受此额度限制。额度按用户分别独立计算，设置后当日生效。存在可用的平台模型时，非超管用户才可使用。</p>
+      <el-form label-width="92px" class="platform-setting__form">
         <el-form-item label="日额度" required>
-          <el-input-number v-model="platformQuotaForm.daily_limit" :min="1" :max="99999" style="width: 100%" />
+          <el-input-number v-model="platformQuotaForm.daily_limit" :min="0" :max="99999" style="width: 100%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -432,11 +431,11 @@
     <el-dialog v-model="rulesVisible" :title="rulesScope === 'platform' ? '平台模型使用说明' : '我的模型使用说明'" width="620px" append-to-body>
       <section v-if="rulesScope === 'platform'" class="rules-section">
         <h4>什么是平台模型</h4>
-        <p>平台模型由平台统一配置，供符合条件的用户共同使用。普通用户只能看到已启用的平台模型；超级管理员可以查看和管理全部平台模型。</p>
+        <p>平台模型由平台统一配置，供符合条件的用户共同使用。非超级管理员用户只能看到已启用的平台模型；超级管理员可以查看和管理全部平台模型。</p>
         <h4>模型优先级</h4>
         <p>系统默认优先使用平台模型；平台模型不可用或额度不足时，再使用我的模型。平台模型和我的模型分别按照模型 ID 升序排列。您也可以在实际使用前手动选择模型。</p>
         <h4>额度与权限</h4>
-        <p>平台模型使用平台统一的平台模型日额度，非超级管理员用户按统一标准分别享有额度；超级管理员不受平台模型调用次数限制。普通用户不能修改平台模型配置，平台模型统一由超级管理员配置和维护。</p>
+        <p>平台模型使用平台统一的平台模型日额度，非超级管理员用户按统一标准分别享有额度；超级管理员不受平台模型调用次数限制。非超级管理员用户不能修改平台模型配置，平台模型统一由超级管理员配置和维护。</p>
       </section>
       <section v-else class="rules-section">
         <h4>什么是我的模型</h4>
@@ -486,6 +485,7 @@ import AiModelDetailDialog from './components/AiModelDetailDialog.vue'
 import GlobalEmpty from '@/components/GlobalEmpty.vue'
 import AdminTabsShell from '@/components/AdminTabsShell.vue'
 import UserDialog from '@/components/UserDialog.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const loading = ref(false)
 const userStore = useUserStore()
@@ -519,16 +519,13 @@ const isPlatformTab = computed(() => activeModelTab.value === 'platform')
 const isUserModelsTab = computed(() => isSuperuser.value && activeModelTab.value === 'users')
 const isCreatingPersonal = computed(() => !isEditing.value && form.value.scope === 'personal')
 const quotaByModelId = computed(() => new Map(personalQuotas.value.map(item => [Number(item.model_id), item])))
-const platformQuotaLabel = computed(() => platformQuotaQueryFailed.value
-  ? '查询失败'
-  : Number(platformQuota.value.quota) > 0 ? `${platformQuota.value.quota} 次 / 天` : '未配置')
-const platformQuotaLimitLabel = computed(() => platformQuotaSettingQueryFailed.value
-  ? '查询失败'
-  : Number(platformQuotaSetting.value.daily_limit) > 0 ? `${platformQuotaSetting.value.daily_limit} 次 / 天` : '未配置')
-const platformQuotaRemainingLabel = computed(() => platformQuotaQueryFailed.value
-  ? '查询失败'
-  : Number(platformQuota.value.quota) > 0 ? `${Math.max(0, Number(platformQuota.value.remaining || 0))} 次` : '未配置')
-// 是否存在启用中的平台模型（后端返回的全局标志，与当前页签/分页无关）。
+const platformQuotaConfigured = computed(() => !platformQuotaQueryFailed.value && platformQuota.value.quota != null && Number(platformQuota.value.quota) >= 0)
+const platformQuotaSettingConfigured = computed(() => !platformQuotaSettingQueryFailed.value && platformQuotaSetting.value.daily_limit != null && Number(platformQuotaSetting.value.daily_limit) >= 0)
+const platformQuotaActionLabel = computed(() => {
+  if (platformQuotaSettingQueryFailed.value) return '重新设置'
+  return platformQuotaSettingConfigured.value ? '去修改' : '暂未配置'
+})
+// 是否存在启用中的平台模型；没有可用模型时，超管也不能配置平台额度。
 const hasAvailablePlatformModel = ref(false)
 // 平台模型展示创建人；用户模型单独展示使用人。
 const showCreatorColumn = computed(() => isPlatformTab.value)
@@ -1068,9 +1065,6 @@ const balanceStatusTooltip = row => {
   return `余额查询${balanceStatusLabel(row?.balance_query_status)}，${time}`
 }
 
-const avatarColors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2', '#f5222d', '#faad14']
-const avatarColor = (id) => avatarColors[(id || 0) % avatarColors.length]
-
 function openUserDetail(row) {
   if (!row?.owner_user_id) return
   userDetailId.value = row.owner_user_id
@@ -1160,16 +1154,20 @@ async function savePersonalQuota() {
 }
 
 function openPlatformQuotaDialog() {
-  const currentLimit = Number(platformQuotaSetting.value.daily_limit)
-  platformQuotaForm.daily_limit = currentLimit > 0 ? currentLimit : null
+  if (!hasAvailablePlatformModel.value) return
+  const currentLimit = platformQuotaSetting.value.daily_limit
+  platformQuotaForm.daily_limit = currentLimit == null ? 0 : Number(currentLimit)
   platformQuotaVisible.value = true
 }
 
 async function savePlatformQuota() {
-  if (Number(platformQuotaForm.daily_limit) <= 0) return ElMessage.warning('日额度须大于 0')
+  const dailyLimit = Number(platformQuotaForm.daily_limit)
+  if (platformQuotaForm.daily_limit == null || !Number.isInteger(dailyLimit) || dailyLimit < 0) {
+    return ElMessage.warning('日额度必须是大于等于 0 的整数')
+  }
   platformQuotaSaving.value = true
   try {
-    await setAiPlatformQuotaSetting(Number(platformQuotaForm.daily_limit))
+    await setAiPlatformQuotaSetting(dailyLimit)
     platformQuotaVisible.value = false
     await loadModels()
   } finally { platformQuotaSaving.value = false }
@@ -1360,14 +1358,7 @@ onMounted(loadModels)
 .page-header { flex-shrink: 0; margin-bottom: 12px; }
 .user-cell { display: flex; align-items: center; }
 .user-link { width: 100%; justify-content: flex-start; margin: 0; padding: 0; overflow: hidden; }
-.user-avatar-sm {
-  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  margin-right: 10px;
-  font-size: 11px; font-weight: 700; color: #fff;
-  overflow: hidden;
-}
-.user-avatar-sm img { width: 100%; height: 100%; object-fit: cover; }
+.user-cell :deep(.user-avatar) { margin-right: 10px; }
 .user-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .model-tabs { flex-shrink: 0; }
@@ -1392,10 +1383,9 @@ onMounted(loadModels)
 .platform-quota-title { color: #1d4ed8; font-weight: 700; }
 .platform-quota-item { display: inline-flex; align-items: baseline; gap: 5px; }
 .platform-quota-item strong { color: #1f2937; font-size: 14px; font-weight: 700; }
-.platform-quota-warning { color: #b45309; font-size: 12px; }
-.platform-quota-remaining strong { color: #16a34a; }
-.platform-quota-remaining.is-low strong { color: #d97706; }
-.platform-quota-remaining.is-empty strong { color: #dc2626; }
+.platform-quota-action-disabled { display: inline-flex; }
+.platform-setting__hint { margin: 0 0 20px; color: var(--el-text-color-secondary); line-height: 1.6; }
+.platform-setting__form :deep(.el-form-item) { margin-bottom: 0; }
 .list-toolbar { min-width: 0; padding: 12px 16px; }
 /* 默认允许换行，工具项在窗口变窄时自动折行，避免筛选/按钮溢出被裁剪 */
 .toolbar-form { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px 12px; width: 100%; }

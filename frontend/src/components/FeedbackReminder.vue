@@ -13,27 +13,29 @@
           <el-tag v-if="badgeValue > 0" size="small" type="danger" effect="plain">{{ badgeValue }}</el-tag>
         </div>
 
-        <div v-if="isAdmin && reminders.pending_count > 0" class="notice-item" @click="goFeedback('pending')">
-          <div class="notice-main">有 {{ reminders.pending_count }} 条新的问题反馈待处理</div>
-          <div class="notice-sub">点击查看待处理反馈</div>
+        <div
+          v-for="item in reminders.items"
+          :key="item.id"
+          class="notice-item"
+          :class="{ 'is-reopened': item.reminder_type === 'reopened' }"
+          @click="goFeedback(item)"
+        >
+          <div class="notice-main">
+            <el-tag size="small" :type="reminderTag(item.reminder_type)" effect="plain">{{ item.reminder_label }}</el-tag>
+            <span class="notice-title-text">{{ item.title || '未命名反馈' }}</span>
+          </div>
+          <div class="notice-sub">
+            <UserAvatar
+              :size="20"
+              :src="item.user_avatar"
+              :name="item.user_name"
+              :user-id="item.user_id"
+            />
+            <span>{{ item.user_name || '本人' }} · {{ formatTime(item.updated_at || item.created_at) }}</span>
+          </div>
         </div>
 
-        <div v-if="isAdmin && reminders.reopened_count > 0" class="notice-item is-reopened" @click="goFeedback('reopened')">
-          <div class="notice-main">有 {{ reminders.reopened_count }} 条已处理反馈被重新打开</div>
-          <div class="notice-sub">提交人继续反馈了问题，需要再次确认处理</div>
-        </div>
-
-        <div v-if="reminders.unread_reply_count > 0" class="notice-item" @click="goFeedback('unreadReply')">
-          <div class="notice-main">你有 {{ reminders.unread_reply_count }} 条反馈有新回复</div>
-          <div class="notice-sub">点击查看处理进展，必要时确认关闭或继续反馈</div>
-        </div>
-
-        <div v-if="reminders.pending_confirm_count > 0" class="notice-item" @click="goFeedback('pendingConfirm')">
-          <div class="notice-main">有 {{ reminders.pending_confirm_count }} 条反馈待你确认</div>
-          <div class="notice-sub">点击查看处理结果并确认是否完成</div>
-        </div>
-
-        <el-empty v-if="badgeValue === 0" description="暂无新的反馈提醒" :image-size="96" />
+        <el-empty v-if="reminders.items.length === 0" description="暂无新的反馈提醒" :image-size="96" />
       </div>
     </el-drawer>
   </div>
@@ -45,14 +47,16 @@ import { useRouter } from 'vue-router'
 import { Bell } from '@element-plus/icons-vue'
 import { getFeedbackReminders } from '@/api/feedback'
 import { useUserStore } from '@/stores/user'
+import { formatBeijingMinute } from '@/utils/beijingTime'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const drawerVisible = ref(false)
-const reminders = ref({ pending_count: 0, unread_reply_count: 0, reopened_count: 0, pending_confirm_count: 0, total: 0 })
+const reminders = ref({ pending_count: 0, todo_count: 0, unread_reply_count: 0, reopened_count: 0, pending_confirm_count: 0, my_attention_count: 0, total: 0, items: [] })
 
-const isAdmin = computed(() => userStore.userInfo?.is_superuser || userStore.userInfo?.is_manager)
-const badgeValue = computed(() => Number(reminders.value.total || 0))
+const isSuperAdmin = computed(() => userStore.userInfo?.is_superuser)
+const badgeValue = computed(() => Number(isSuperAdmin.value ? reminders.value.todo_count : reminders.value.my_attention_count) || 0)
 
 async function loadReminders() {
   if (!userStore.userInfo) return
@@ -60,10 +64,13 @@ async function loadReminders() {
     const res = await getFeedbackReminders()
     reminders.value = {
       pending_count: Number(res?.pending_count || 0),
+      todo_count: Number(res?.todo_count || 0),
       unread_reply_count: Number(res?.unread_reply_count ?? res?.unread_resolved_count ?? 0),
       reopened_count: Number(res?.reopened_count || 0),
       pending_confirm_count: Number(res?.pending_confirm_count || 0),
+      my_attention_count: Number(res?.my_attention_count || 0),
       total: Number(res?.total || 0),
+      items: Array.isArray(res?.items) ? res.items : [],
     }
   } catch {}
 }
@@ -73,15 +80,20 @@ function openDrawer() {
   drawerVisible.value = true
 }
 
-function goFeedback(type) {
+function formatTime(value) {
+  return formatBeijingMinute(value)
+}
+
+function reminderTag(type) {
+  return type === 'reopened' ? 'warning' : type === 'pending_confirm' ? 'danger' : type === 'unread_reply' ? 'primary' : 'info'
+}
+
+function goFeedback(item) {
   drawerVisible.value = false
-  const query = type === 'pendingConfirm'
-    ? { tab: 'my', status: 'pending_confirm' }
-    : type === 'pending'
-    ? { tab: 'todo' }
-    : type === 'reopened'
-      ? { tab: 'todo', reopened: '1' }
-    : { tab: 'my' }
+  const query = {
+    tab: isSuperAdmin.value ? 'todo' : 'my',
+    feedback_id: String(item.id),
+  }
   router.push({ path: '/feedback', query })
 }
 
@@ -118,7 +130,7 @@ onBeforeUnmount(() => {
 .notice-group { display: flex; flex-direction: column; gap: 12px; }
 .notice-title { display: flex; align-items: center; justify-content: space-between; font-size: 16px; font-weight: 700; color: #303133; }
 .notice-item {
-  padding: 14px;
+  padding: 12px;
   border: 1px solid #ebeef5;
   border-radius: 8px;
   background: #fff;
@@ -128,6 +140,7 @@ onBeforeUnmount(() => {
 .notice-item:hover { border-color: var(--nexus-primary, #1677ff); background: #f7fbff; }
 .notice-item.is-reopened { border-color: #f3d19e; background: #fffaf2; }
 .notice-item.is-reopened:hover { border-color: #e6a23c; background: #fff7e8; }
-.notice-main { font-size: 14px; font-weight: 600; color: #303133; line-height: 1.5; }
-.notice-sub { margin-top: 4px; font-size: 12px; color: #909399; }
+.notice-main { display: flex; align-items: flex-start; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; color: #303133; line-height: 1.5; }
+.notice-title-text { min-width: 0; flex: 1; word-break: break-word; }
+.notice-sub { display: flex; align-items: center; gap: 5px; margin-top: 5px; font-size: 12px; color: #909399; line-height: 20px; }
 </style>

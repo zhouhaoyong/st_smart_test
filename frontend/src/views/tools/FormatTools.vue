@@ -1,6 +1,12 @@
 <template>
   <div class="tool-page">
-    <div class="page-header"><h2>{{ pageTitle }}</h2></div>
+    <div class="page-header">
+      <h2>{{ pageTitle }}</h2>
+      <el-button v-if="activeTab === 'markdown'" type="primary" plain @click="markdownExamplesVisible = true">
+        <el-icon><Document /></el-icon>
+        常见语法示例
+      </el-button>
+    </div>
     <el-card>
       <el-tabs v-model="activeTab" class="format-tabs">
         <el-tab-pane label="JSON" name="json">
@@ -82,6 +88,37 @@
         </el-tab-pane>
       </el-tabs>
     </el-card>
+    <el-dialog
+      v-model="markdownExamplesVisible"
+      class="markdown-example-dialog"
+      title="常见语法示例"
+      width="min(1100px, 92vw)"
+      top="5vh"
+    >
+      <p class="markdown-example-intro">左侧查看 Markdown 源码，右侧查看渲染效果；示例仅供查看，不会修改当前编辑内容。</p>
+      <div class="markdown-example-layout">
+        <section class="markdown-example-panel">
+          <div class="markdown-example-panel-title">示例源码</div>
+          <textarea
+            ref="markdownExampleSourceRef"
+            class="markdown-example-source"
+            :value="markdownSyntaxExample"
+            readonly
+            spellcheck="false"
+            @scroll="onMarkdownExampleSourceScroll"
+          />
+        </section>
+        <section class="markdown-example-panel">
+          <div class="markdown-example-panel-title">预览效果</div>
+          <div
+            ref="markdownExamplePreviewRef"
+            class="markdown-example-preview"
+            v-html="markdownSyntaxRendered"
+            @scroll="onMarkdownExamplePreviewScroll"
+          />
+        </section>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -89,7 +126,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Operation, Switch, CircleCheck, Delete } from '@element-plus/icons-vue'
+import { Document, Operation, Switch, CircleCheck, Delete } from '@element-plus/icons-vue'
 import CopyButton from '@/components/CopyButton.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import { getEditorScrollTopForHeading, getSyncedScrollTopByRatio } from '@/utils/markdownScrollSync'
@@ -172,8 +209,238 @@ const jsonValidate = () => {
 const jsonClear = () => { json.input = ''; json.output = ''; json.error = ''; json.stats = '' }
 const jsonClearInputResult = () => { json.error = ''; json.stats = '' }
 
+const markdownSample = `# 智测
+
+欢迎使用 **Markdown 预览** 工具。
+
+## 功能
+
+- 实时预览
+- GitHub 风格 Markdown
+- 代码高亮
+
+\`\`\`js
+console.log('Hello, 智测！')
+\`\`\`
+
+> 智测 - 综合性开发工具平台`
+
+const markdownSyntaxExample = `# Markdown 语法示例
+
+欢迎使用 **Markdown 预览** 工具。下面集中展示常见的 Markdown 与 GitHub Flavored Markdown（GFM）写法。
+
+## 1. 标题与段落
+
+# 一级标题
+## 二级标题
+### 三级标题
+#### 四级标题
+##### 五级标题
+###### 六级标题
+
+这是一个普通段落。Markdown 会自动处理连续文本和段落间距。
+
+这一行末尾有两个空格  
+因此会强制换行；也可以使用 HTML 换行标签<br>继续下一行。
+
+---
+
+## 2. 字体与行内语法
+
+- **粗体文字**
+- *斜体文字*
+- ***粗斜体文字***
+- ~~删除线文字~~
+- \`行内代码\`
+- [普通链接](https://www.example.com "链接标题")
+- <https://www.example.com>
+- <markdown@example.com>
+- \*转义特殊字符，不会变成斜体\*
+- 使用反斜杠转义：\\ \\* \\_ \\# \\[ \\]
+
+快捷键示例：<kbd>Ctrl</kbd> + <kbd>S</kbd>
+
+## 3. 链接与图片
+
+这是一个[带标题的链接](https://www.example.com "Example 网站")。
+
+也可以使用引用式链接：[智测官网][smart-test]。
+
+[smart-test]: https://www.example.com "智测示例链接"
+
+![智测图标](/favicon.svg "智测图标")
+
+## 4. 无序列表
+
+- 第一项
+- 第二项
+  - 二级项目
+  - 二级项目中的内容
+    - 三级项目
+- 第三项
+
+也可以使用其他符号：
+
+* 星号项目
+* 仍然是同一类列表
+
++ 加号项目
++ 仍然是同一类列表
+
+## 5. 有序列表
+
+1. 第一步：准备数据
+2. 第二步：调用接口
+   1. 校验请求参数
+   2. 发送请求
+3. 第三步：检查响应
+
+## 6. 任务列表
+
+- [x] 完成 Markdown 解析
+- [x] 完成实时预览
+- [ ] 增加更多示例
+- [ ] 发布到生产环境
+
+## 7. 引用
+
+> 这是一段普通引用。
+>
+> Markdown 适合编写接口说明、测试报告和项目文档。
+>
+> > 这是嵌套引用。
+> >
+> > 可以在引用中继续使用 **粗体**、\`代码\` 和列表：
+> >
+> > - 引用中的列表项
+> > - 另一个列表项
+
+## 8. 表格
+
+| 字段 | 类型 | 是否必填 | 说明 |
+| :--- | :---: | :---: | ---: |
+| name | string | 是 | 用户名称 |
+| age | number | 否 | 用户年龄 |
+| enabled | boolean | 否 | 是否启用 |
+
+表格中也可以使用 **粗体**、\`代码\` 和[链接](https://www.example.com)。
+
+## 9. 代码块
+
+JavaScript：
+
+\`\`\`js
+const request = {
+  method: 'GET',
+  url: '/api/users',
+  enabled: true,
+}
+
+console.log(request)
+\`\`\`
+
+JSON：
+
+\`\`\`json
+{
+  "name": "智测",
+  "version": "1.0.0",
+  "features": ["API 测试", "Markdown 预览"]
+}
+\`\`\`
+
+Python：
+
+\`\`\`python
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+
+print(greet("Markdown"))
+\`\`\`
+
+Shell：
+
+\`\`\`bash
+docker compose up -d --build
+\`\`\`
+
+无语言标记的代码块：
+
+    这是缩进四个空格的代码块
+    可以保留空格和换行
+
+## 10. 分隔线与特殊字符
+
+下面是三种常见的分隔线写法：
+
+---
+
+***
+
+___
+
+特殊字符：\*星号\*、\_下划线\_、\#井号、\[方括号\]、\|竖线。
+
+## 11. 行内 HTML
+
+Markdown 也支持部分行内 HTML，例如：<mark>高亮文字</mark>、<sub>下标</sub>、<sup>上标</sup>。
+
+<details>
+<summary>点击展开更多说明</summary>
+
+这是一个 HTML details 区块。最终内容仍会经过安全过滤。
+
+</details>
+
+## 12. 综合示例
+
+### 接口说明：获取用户信息
+
+> 用于根据用户 ID 获取用户详情。
+
+**请求方法：** \`GET\`
+
+**请求地址：** \`/api/users/{id}\`
+
+**请求参数：**
+
+| 参数 | 位置 | 类型 | 示例 |
+| --- | --- | --- | --- |
+| id | Path | number | 10001 |
+| token | Header | string | Bearer ****** |
+
+**响应示例：**
+
+\`\`\`json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 10001,
+    "name": "张三"
+  }
+}
+\`\`\`
+
+- [x] 返回 HTTP 200
+- [x] 返回用户信息
+- [ ] 增加异常场景断言
+
+---
+
+> 智测 - 综合性开发工具平台`
+
+
+const markdownSyntaxRendered = computed(() => renderMarkdown(markdownSyntaxExample))
+const markdownExamplesVisible = ref(false)
+const markdownExampleSourceRef = ref(null)
+const markdownExamplePreviewRef = ref(null)
+let markdownExampleScrollRaf = 0
+const markdownExampleIgnoreScrollFrom = new Set()
+let markdownExampleIgnoreScrollTimer = null
+
 const md = reactive({
-  input: `# 智测\n\n欢迎使用 **Markdown 预览** 工具。\n\n## 功能\n\n- 实时预览\n- GitHub 风格 Markdown\n- 代码高亮\n\n\`\`\`js\nconsole.log('Hello, 智测!')\n\`\`\`\n\n> 智测 - 综合性开发工具平台`,
+  input: markdownSample,
 })
 
 const mdPreviewRef = ref(null)
@@ -284,6 +551,53 @@ function _syncMarkdownScroll(source) {
   })
 }
 
+function _setMarkdownExampleScroll(targetName, target, scrollTop) {
+  if (!target) return
+  const maxScroll = _mdMaxScroll(target)
+  const nextTop = _mdClamp(scrollTop, 0, maxScroll)
+  if (Math.abs(target.scrollTop - nextTop) < 1) return
+  markdownExampleIgnoreScrollFrom.add(targetName)
+  target.scrollTop = nextTop
+  if (markdownExampleIgnoreScrollTimer) clearTimeout(markdownExampleIgnoreScrollTimer)
+  markdownExampleIgnoreScrollTimer = setTimeout(() => {
+    markdownExampleIgnoreScrollFrom.clear()
+  }, 80)
+}
+
+function _syncMarkdownExampleScroll(source) {
+  const sourceEl = source === 'source' ? markdownExampleSourceRef.value : markdownExamplePreviewRef.value
+  const targetEl = source === 'source' ? markdownExamplePreviewRef.value : markdownExampleSourceRef.value
+  const targetName = source === 'source' ? 'preview' : 'source'
+  if (!sourceEl || !targetEl) return
+  if (markdownExampleScrollRaf) cancelAnimationFrame(markdownExampleScrollRaf)
+  markdownExampleScrollRaf = requestAnimationFrame(() => {
+    const scrollTop = getSyncedScrollTopByRatio({
+      sourceScrollTop: sourceEl.scrollTop,
+      sourceScrollHeight: sourceEl.scrollHeight,
+      sourceClientHeight: sourceEl.clientHeight,
+      targetScrollHeight: targetEl.scrollHeight,
+      targetClientHeight: targetEl.clientHeight,
+    })
+    _setMarkdownExampleScroll(targetName, targetEl, scrollTop)
+  })
+}
+
+const onMarkdownExampleSourceScroll = () => {
+  if (markdownExampleIgnoreScrollFrom.has('source')) {
+    markdownExampleIgnoreScrollFrom.delete('source')
+    return
+  }
+  _syncMarkdownExampleScroll('source')
+}
+
+const onMarkdownExamplePreviewScroll = () => {
+  if (markdownExampleIgnoreScrollFrom.has('preview')) {
+    markdownExampleIgnoreScrollFrom.delete('preview')
+    return
+  }
+  _syncMarkdownExampleScroll('preview')
+}
+
 const mdScrollToHeading = (id) => {
   const heading = mdToc.value.find((item) => item.id === id)
   const pv = mdPreviewRef.value
@@ -313,8 +627,74 @@ const onPreviewScroll = () => {
 </script>
 
 <style scoped>
-.page-header { margin-bottom: 20px; }
+.page-header { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .page-header h2 { margin: 0; font-size: 22px; }
+.markdown-example-intro { margin: 0 0 12px; color: #909399; font-size: 13px; line-height: 1.6; }
+.markdown-example-dialog :deep(.el-dialog__body) { overflow: hidden; }
+.markdown-example-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  height: calc(90vh - 125px);
+  min-height: 420px;
+}
+.markdown-example-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.markdown-example-panel-title {
+  flex: none;
+  padding: 10px 12px;
+  color: #606266;
+  background: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 13px;
+  font-weight: 600;
+}
+.markdown-example-source {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  padding: 12px;
+  color: #303133;
+  background: #fff;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: SFMono-Regular, Consolas, Monaco, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre;
+  overflow: auto;
+  box-sizing: border-box;
+}
+.markdown-example-preview {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 16px;
+  color: #303133;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow: auto;
+}
+.markdown-example-preview :deep(h1) { font-size: 24px; margin: 16px 0 8px; }
+.markdown-example-preview :deep(h2) { font-size: 20px; margin: 14px 0 6px; }
+.markdown-example-preview :deep(h3) { font-size: 17px; margin: 12px 0 4px; }
+.markdown-example-preview :deep(p) { margin: 6px 0; }
+.markdown-example-preview :deep(code) { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+.markdown-example-preview :deep(pre) { background: #f5f7fa; padding: 12px 16px; border-radius: 6px; overflow-x: auto; }
+.markdown-example-preview :deep(blockquote) { border-left: 3px solid #1677ff; padding-left: 12px; margin: 8px 0; color: #666; }
+.markdown-example-preview :deep(ul), .markdown-example-preview :deep(ol) { padding-left: 20px; }
+.markdown-example-preview :deep(table) { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.markdown-example-preview :deep(th), .markdown-example-preview :deep(td) { border: 1px solid #e8e8e8; padding: 6px 10px; text-align: left; }
+.markdown-example-preview :deep(th) { background: #fafafa; font-weight: 600; }
 .panel-label { font-weight: 600; font-size: 14px; color: #595959; }
 .panel-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .panel-title :deep(.el-button) { padding: 2px 4px; min-height: 24px; }
@@ -402,6 +782,15 @@ const onPreviewScroll = () => {
 .md-preview :deep(th) { background: #fafafa; font-weight: 600; }
 @media (max-width: 900px) {
   .split-editor,
-  .md-layout { grid-template-columns: 1fr; }
+  .md-layout,
+  .markdown-example-layout { grid-template-columns: 1fr; }
+  .markdown-example-dialog :deep(.el-dialog__body) { overflow: auto; }
+  .markdown-example-layout { height: auto; }
+  .markdown-example-panel { min-height: 360px; }
+  .markdown-example-source,
+  .markdown-example-preview { flex: none; height: 360px; }
+}
+@media (max-width: 600px) {
+  .page-header { align-items: flex-start; flex-direction: column; }
 }
 </style>

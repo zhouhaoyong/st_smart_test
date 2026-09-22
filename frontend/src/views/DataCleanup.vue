@@ -49,8 +49,8 @@
           <el-button type="primary" :icon="Search" @click="handlePreview" :loading="previewLoading" :disabled="!isConfigValid">
             预览可清理数据
           </el-button>
-          <el-button type="danger" :icon="Delete" @click="handleCleanup" :loading="cleanupLoading" :disabled="!isConfigValid || !previewData || previewData.total_tables === 0">
-            执行全量清理
+          <el-button type="danger" :icon="Delete" @click="handleCleanup" :loading="cleanupLoading" :disabled="!isConfigValid || !isPreviewCurrent || previewData.total_tables === 0">
+            执行查询范围清理
           </el-button>
           <el-button :icon="Refresh" @click="handleReset">重置</el-button>
         </el-form-item>
@@ -68,7 +68,7 @@
             • 清理条件：<code>is_deleted = 1 AND deleted_at IS NOT NULL AND deleted_at &lt;= 选择的截止时间</code><br/>
             • 此操作为物理删除，无法恢复，请谨慎操作<br/>
             • 仅超级管理员可执行<br/>
-            • 支持单表清理和全量清理两种方式
+            • 支持单表清理和查询范围清理两种方式
           </div>
         </template>
       </el-alert>
@@ -339,7 +339,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { previewCleanup, previewTableData, cleanupData, cleanupSingleTable } from '@/api/cleanup'
 import { Search, Delete, Refresh, Document } from '@element-plus/icons-vue'
@@ -355,6 +355,7 @@ const previewLoading = ref(false)
 const cleanupLoading = ref(false)
 const singleDeleteLoading = ref(null)  // 存储正在删除的表名
 const previewData = ref(null)
+const previewQuery = ref(null)
 const cleanupResult = ref(null)
 const errorMessage = ref('')
 
@@ -404,6 +405,20 @@ const isConfigValid = computed(() => {
   }
 })
 
+const getCurrentPreviewQuery = () => ({
+  mode: configForm.mode,
+  cutoff: configForm.mode === 'datetime' ? configForm.cutoff : null,
+  days: configForm.mode === 'days' ? Number(configForm.days) : null,
+  tableName: searchKeyword.tableName?.trim() || '',
+  chineseName: searchKeyword.chineseName?.trim() || '',
+})
+
+const isPreviewCurrent = computed(() => {
+  if (!previewData.value || !previewQuery.value) return false
+  const current = getCurrentPreviewQuery()
+  return Object.keys(current).every((key) => current[key] === previewQuery.value[key])
+})
+
 // 过滤后的表列表（不再需要前端过滤，后端已处理）
 const filteredTables = computed(() => {
   if (!previewData.value || !previewData.value.tables) return []
@@ -414,16 +429,18 @@ const handlePreview = async () => {
   previewLoading.value = true
   cleanupResult.value = null
   errorMessage.value = ''
+  const query = getCurrentPreviewQuery()
   
   try {
     const res = await previewCleanup(
-      configForm.mode,
-      configForm.mode === 'datetime' ? configForm.cutoff : null,
-      configForm.mode === 'days' ? configForm.days : 7,
-      searchKeyword.tableName?.trim() || '',
-      searchKeyword.chineseName?.trim() || ''
+      query.mode,
+      query.cutoff,
+      query.days ?? 7,
+      query.tableName,
+      query.chineseName
     )
     previewData.value = res
+    previewQuery.value = query
   } catch (error) {
     errorMessage.value = error?.message || '预览统计失败，请重试'
   } finally {
@@ -443,7 +460,7 @@ const handleCleanup = async () => {
   try {
     await ElMessageBox.confirm(
       `<div style="color: #f56c6c; font-weight: bold; margin-bottom: 12px;">⚠️ 高危操作警告</div>
-       <div style="margin-bottom: 8px;">您即将清理<strong>所有表</strong>中符合条件的软删除数据。</div>
+       <div style="margin-bottom: 8px;">您即将清理<strong>当前查询结果中的所有表</strong>中符合条件的软删除数据。</div>
        <div style="margin-bottom: 8px;">系统将按数据依赖关系自动清理，优先清理关联数据，避免外键约束导致失败。</div>
        <div style="margin-bottom: 8px;">截止时间：${cutoffText}</div>
        <div style="margin-bottom: 8px;">预计影响：<strong>${previewData.value?.total_tables || 0}</strong> 个表</div>
@@ -451,7 +468,7 @@ const handleCleanup = async () => {
        <div style="color: #f56c6c;">此操作不可恢复，请再次确认是否继续？</div>`,
       '极度危险操作',
       {
-        confirmButtonText: '我确定要清理所有数据',
+        confirmButtonText: '我确定要清理当前范围',
         cancelButtonText: '取消',
         type: 'error',
         dangerouslyUseHTMLString: true,
@@ -473,7 +490,8 @@ const handleCleanup = async () => {
     const res = await cleanupData(
       configForm.mode,
       configForm.mode === 'datetime' ? configForm.cutoff : null,
-      configForm.mode === 'days' ? configForm.days : 7
+      configForm.mode === 'days' ? configForm.days : 7,
+      previewData.value.tables.map((table) => table.table_name)
     )
     cleanupResult.value = res
     
@@ -486,7 +504,7 @@ const handleCleanup = async () => {
         message: res.message || `已清理 ${res.tables_cleaned || 0} 个表中的 ${res.total_records_deleted || 0} 条数据`
       }
       // 清理成功后刷新预览
-      handlePreview()
+      await handlePreview()
     } else {
       cleanupDialogTitle.value = '清理失败'
       cleanupDialogResult.value = {
@@ -588,6 +606,7 @@ const handleReset = () => {
   configForm.cutoff = formatBeijingTime(new Date()).replace(' ', 'T')
   configForm.days = 7
   previewData.value = null
+  previewQuery.value = null
   cleanupResult.value = null
   searchKeyword.tableName = ''
   searchKeyword.chineseName = ''
@@ -605,6 +624,9 @@ const handleTableRowClick = (row) => {
 const handleResetSearch = () => {
   searchKeyword.tableName = ''
   searchKeyword.chineseName = ''
+  if (previewData.value) {
+    handlePreview()
+  }
 }
 
 const viewTableData = async (tableName) => {
@@ -633,15 +655,18 @@ const viewTableData = async (tableName) => {
 const handleModeChange = () => {
   // 切换模式后清空预览数据
   previewData.value = null
+  previewQuery.value = null
   cleanupResult.value = null
 }
 
-// 移除自动刷新预览的监听
-// watch(() => [configForm.cutoff, configForm.days], () => {
-//   if (previewData.value) {
-//     handlePreview()
-//   }
-// }, { deep: true })
+// 清理条件变化后，旧预览不再作为执行依据，但不自动发起查询。
+watch(() => [configForm.mode, configForm.cutoff, configForm.days], () => {
+  if (previewData.value) {
+    previewData.value = null
+    previewQuery.value = null
+    cleanupResult.value = null
+  }
+})
 </script>
 
 <style scoped>

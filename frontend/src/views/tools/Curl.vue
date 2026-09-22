@@ -10,7 +10,7 @@
               <CopyButton :value="curlText" label="复制" tooltip="复制 cURL 命令" />
               <el-button size="small" @click="clearCurl" :disabled="!curlText && !result && !error">清空</el-button>
               <el-button size="small" type="primary" @click="handleParse" :loading="loading">解析 cURL</el-button>
-              <el-button size="small" type="success" @click="handleRun" :disabled="!result">运行接口</el-button>
+              <el-button size="small" type="success" @click="handleRun" :loading="runLoading" :disabled="!curlText.trim()">运行接口</el-button>
             </div>
           </div>
           <el-input v-model="curlText" class="curl-input" type="textarea" :rows="18" placeholder="粘贴 cURL 命令" />
@@ -21,6 +21,14 @@
             <span class="panel-label">解析结果</span>
             <CopyButton :value="result ? jsonStr(result) : ''" label="复制 JSON" tooltip="复制解析结果" />
           </div>
+          <el-alert
+            v-if="isParseResultStale"
+            title="输入内容已修改，运行接口时将以当前输入为准；右侧解析结果仍为上次解析内容。"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="parse-stale-tip"
+          />
           <div class="result-box">
             <template v-if="result">
               <CurlRequestPreview
@@ -49,14 +57,14 @@
     </el-card>
 
     <el-dialog v-model="runDialogVisible" title="运行接口" width="880px" destroy-on-close>
-      <template v-if="result">
+      <div v-if="runLoading" class="run-loading">正在运行接口，请稍候...</div>
+      <div v-if="runError" class="run-error">
+        <el-alert :title="runError" type="error" show-icon :closable="false" />
+      </div>
+      <template v-if="runResult">
         <div class="run-request-hero">
-          <el-tag type="primary" effect="dark">{{ result.method || 'GET' }}</el-tag>
-          <span>{{ runResult?.request?.url || result.full_url || result.url || '-' }}</span>
-        </div>
-
-        <div v-if="runError" class="run-error">
-          <el-alert :title="runError" type="error" show-icon :closable="false" />
+          <el-tag type="primary" effect="dark">{{ runRequestMethod }}</el-tag>
+          <span>{{ runRequestUrl }}</span>
         </div>
 
         <div v-if="runResult" class="run-status-row">
@@ -68,9 +76,9 @@
           <el-tab-pane label="请求信息" name="request">
             <ExecutionRequestDetail
               v-model:active-tab="activeRunRequestTab"
-              :request-url="runResult?.request?.url || result.full_url || result.url"
-              :params-text="displayQueryParams"
-              :path-params-text="displayPathParams"
+              :request-url="runRequestUrl"
+              :params-text="displayRunQueryParams"
+              :path-params-text="displayRunPathParams"
               :body-text="displayRunRequestBody"
               :headers-text="displayRunRequestHeaders"
               :show-proxy="false"
@@ -112,6 +120,7 @@ import ExecutionResponseDetail from '@/components/ExecutionResponseDetail.vue'
 const curlText = ref('')
 const loading = ref(false)
 const result = ref(null)
+const parsedCurlText = ref('')
 const error = ref('')
 const activeResultTab = ref('info')
 const runDialogVisible = ref(false)
@@ -160,6 +169,26 @@ const displayPathParams = computed(() => jsonStr(result.value?.path_params || []
 const displayHeaders = computed(() => jsonStr(pairsToObject(result.value?.headers)))
 const queryParamCount = computed(() => result.value?.query_params?.length || 0)
 const headerCount = computed(() => result.value?.headers?.length || 0)
+const isParseResultStale = computed(() => (
+  Boolean(result.value) && parsedCurlText.value.trim() !== curlText.value.trim()
+))
+
+const runRequestMethod = computed(() => runResult.value?.request?.method || 'GET')
+const runRequestUrl = computed(() => runResult.value?.request?.url || '-')
+
+const displayRunQueryParams = computed(() => {
+  const request = runResult.value?.request
+  if (!request) return '(无)'
+  try {
+    const url = new URL(request.url, window.location.origin)
+    const pairs = Array.from(url.searchParams.entries()).map(([key, value]) => ({ key, value }))
+    return jsonStr(pairsToObject(pairs))
+  } catch {
+    return '(无)'
+  }
+})
+
+const displayRunPathParams = computed(() => jsonStr([]))
 
 const displayBodyContent = computed(() => {
   const body = result.value?.body_content
@@ -174,16 +203,15 @@ const displayBodyContent = computed(() => {
 const displayResponseBody = computed(() => runResult.value ? jsonStr(runResult.value.response?.body) : '暂无响应')
 const displayResponseHeaders = computed(() => runResult.value ? jsonStr(runResult.value.response?.headers) : '暂无响应')
 const displayRunRequestHeaders = computed(() => {
-  const headers = runResult.value?.request?.headers
-  return jsonStr(headers && Object.keys(headers).length ? headers : pairsToObject(result.value?.headers))
+  const request = runResult.value?.request
+  const headers = request?.headers
+  return jsonStr(headers && Object.keys(headers).length ? headers : null)
 })
 const displayRunRequestBody = computed(() => {
-  const body = runResult.value?.request?.body || result.value?.body_content
+  const body = runResult.value?.request?.body
   if (!body) return '(无)'
-  if (result.value?.body_type === 'form') return jsonStr(formStringToObject(body))
-  if (result.value?.body_type === 'json') {
-    try { return JSON.stringify(JSON.parse(body), null, 2) } catch { return body }
-  }
+  try { return JSON.stringify(JSON.parse(body), null, 2) } catch { /* 当前请求体不是 JSON，继续按原文展示 */ }
+  if (body.includes('=') && body.includes('&')) return jsonStr(formStringToObject(body))
   return jsonStr({ raw: body })
 })
 const responseStatusType = computed(() => {
@@ -197,6 +225,7 @@ const responseStatusType = computed(() => {
 const clearCurl = () => {
   curlText.value = ''
   result.value = null
+  parsedCurlText.value = ''
   error.value = ''
   activeResultTab.value = 'info'
   runResult.value = null
@@ -216,6 +245,7 @@ const handleParse = async () => {
   result.value = null
   try {
     result.value = await parseCurl(curlText.value)
+    parsedCurlText.value = curlText.value
     activeResultTab.value = 'info'
     runResult.value = null
     runError.value = ''
@@ -256,6 +286,7 @@ const handleRun = async () => {
 .panel-label { font-weight: 600; font-size: 14px; color: #595959; }
 .panel-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .panel-actions :deep(.el-button) { margin-left: 0; }
+.parse-stale-tip { margin-bottom: 10px; }
 .curl-input { flex: 1; display: flex; }
 .curl-panel :deep(.el-textarea__inner) {
   height: 470px;
@@ -300,6 +331,11 @@ const handleRun = async () => {
   word-break: break-all;
 }
 .run-error { margin: 12px 0; }
+.run-loading {
+  padding: 28px 0;
+  color: #606266;
+  text-align: center;
+}
 .run-detail-tabs { border: 1px solid #e8edf3; border-radius: 8px; padding: 0 12px 12px; background: #fff; }
 .run-status-row {
   display: flex;

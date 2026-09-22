@@ -146,6 +146,9 @@ async def preview_cleanup(
             message="清理预览统计失败，请稍后重试",
             data={"failed_tables": preview_errors},
         )
+
+    # 优先展示待清理数据较多的表；数量相同时按表名稳定排序，避免查询结果随机变化。
+    tables_info.sort(key=lambda item: (-item["pending_count"], item["table_name"]))
     
     return success_response(
         data={
@@ -221,16 +224,18 @@ async def cleanup_data(
     mode: str = Query("datetime", regex="^(datetime|days)$", description="清理模式"),
     cutoff: str = Query(None, description="截止时间（ISO格式）"),
     days: int = Query(7, ge=0, le=365, description="清理天数，0表示清理所有"),
+    table_names: str = Query(None, description="本次清理的表名，多个表名用逗号分隔"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    清理所有表的软删除数据（仅超级管理员）
+    清理查询范围内表的软删除数据（仅超级管理员）
     
     Args:
         mode: 清理模式 - datetime(按时间) 或 days(按天数)
         cutoff: 截止时间（ISO 8601格式）
         days: 清理天数，0表示清理所有
+        table_names: 查询结果中的表名范围，多个表名用逗号分隔
     """
     if not current_user.is_superuser:
         raise UnifiedException(code=403, message="权限不足")
@@ -253,7 +258,21 @@ async def cleanup_data(
     if mode == "days" and days == 0:
         logger.warning(f"User {current_user.id} is attempting to clean ALL soft-deleted data (days=0)")
     
-    result = await cleanup_soft_deleted_data(db=db, cutoff_time=cutoff_time)
+    selected_table_names = None
+    if table_names is not None:
+        selected_table_names = [item.strip() for item in table_names.split(",") if item.strip()]
+        valid_table_names = await get_valid_table_names(db)
+        invalid_table_names = sorted(set(selected_table_names) - valid_table_names)
+        if invalid_table_names:
+            raise UnifiedException(code=400, message=f"存在无效的表名: {', '.join(invalid_table_names)}")
+        if not selected_table_names:
+            raise UnifiedException(code=400, message="本次清理未选择有效表范围")
+
+    result = await cleanup_soft_deleted_data(
+        db=db,
+        cutoff_time=cutoff_time,
+        table_names=selected_table_names,
+    )
     if not result.get("success", False):
         raise UnifiedException(code=500, message=result.get("message") or "物理清理失败")
     await log_operation(
@@ -267,6 +286,7 @@ async def cleanup_data(
         details={
             "mode": mode,
             "cutoff_time": cutoff_time.isoformat(),
+            "table_names": selected_table_names,
             "tables_cleaned": result.get("tables_cleaned", 0),
             "total_records_deleted": result.get("total_records_deleted", 0),
         },

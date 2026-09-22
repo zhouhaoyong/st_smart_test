@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.response import UnifiedException, success_response
 from core.security import get_current_active_user
 from core.timezone import beijing_now
 from db.session import get_db
-from models.models import TWBugRecord, TWBugTransition, TWCompletedRequirement, TWLegacyItem, TWRequirement, TWVersion, User
+from models.models import TWBugRecord, TWBugTransition, TWCompletedRequirement, TWLegacyItem, TWProject, TWRequirement, TWVersion, User
 from schemas.test_workbench import (
     TWBugAssign,
     TWBugBatchOperate,
@@ -54,6 +54,24 @@ async def _validate_bug_user(db: AsyncSession, user_id: int | None, role_name: s
         raise UnifiedException(code=400, message=f"{role_name}不存在")
 
 
+async def _validate_bug_assignee(db: AsyncSession, user_id: int | None, project: TWProject) -> None:
+    """校验指派人必须是启用用户，并处于当前项目可访问范围内。"""
+    if user_id is None:
+        return
+
+    conditions = [
+        User.id == user_id,
+        User.is_deleted == False,
+        User.is_active == True,
+    ]
+    if not project.is_public:
+        conditions.append(or_(User.id == project.created_by, User.is_superuser == True))
+
+    user = (await db.execute(select(User).where(*conditions))).scalar_one_or_none()
+    if not user:
+        raise UnifiedException(code=400, message="指派人不在当前项目可访问范围内")
+
+
 def _record_bug_transition(
     db: AsyncSession,
     bug: TWBugRecord,
@@ -77,7 +95,7 @@ def _record_bug_transition(
 @router.post("/bugs")
 async def create_bug(data: TWBugCreate, current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
     version = await get_version(db, data.version_id, current_user)
-    await get_project(db, version.project_id, current_user)
+    project = await get_project(db, version.project_id, current_user)
     await ensure_project_unique_value(db, TWBugRecord, version.project_id, "title", data.title, "Bug 标题")
     test_case = await _validate_test_case_relation(db, current_user, data.test_case_id, version)
     inferred_requirement_id = data.requirement_id or getattr(test_case, "requirement_id", None)
@@ -100,7 +118,7 @@ async def create_bug(data: TWBugCreate, current_user: User = Depends(get_current
     await _validate_requirement_relation(db, current_user, inferred_requirement_id, version)
     await _validate_merged_requirement_relation(db, current_user, data.merged_requirement_id, version)
     await _validate_execution_relation(db, data.execution_id, version, data.test_case_id)
-    await _validate_bug_user(db, data.assignee_id, "指派人")
+    await _validate_bug_assignee(db, data.assignee_id, project)
     bug_data = data.model_dump()
     bug_data["requirement_id"] = inferred_requirement_id
     bug_data["project_id"] = version.project_id
@@ -132,6 +150,7 @@ async def update_bug(bug_id: int, data: TWBugUpdate, current_user: User = Depend
         raise UnifiedException(code=400, message="Bug 不存在")
     await ensure_manage_workbench_record(db, current_user, bug)
     version = await get_version(db, bug.version_id, current_user)
+    project = await get_project(db, bug.project_id, current_user)
     before = snapshot_workbench_record(bug)
     payload = data.model_dump(exclude_unset=True)
     if "title" in payload:
@@ -150,7 +169,7 @@ async def update_bug(bug_id: int, data: TWBugUpdate, current_user: User = Depend
             payload.get("test_case_id", bug.test_case_id),
         )
     if "assignee_id" in payload:
-        await _validate_bug_user(db, payload["assignee_id"], "指派人")
+        await _validate_bug_assignee(db, payload["assignee_id"], project)
     if "verifier_id" in payload:
         await _validate_bug_user(db, payload["verifier_id"], "验证人")
     for field, value in payload.items():
@@ -240,11 +259,12 @@ async def assign_bug(bug_id: int, data: TWBugAssign, current_user: User = Depend
     """指派人（可先提单后指派）。"""
     bug, version = await _get_bug_for_action(db, bug_id, current_user)
     await ensure_manage_workbench_record(db, current_user, bug)
+    project = await get_project(db, bug.project_id, current_user)
     if bug.status in {"closed", "legacy"}:
         raise UnifiedException(code=400, message="已验证关闭或已转为遗留项的 Bug 不能再指派")
     before = snapshot_workbench_record(bug)
     if data.assignee_id is not None:
-        await _validate_bug_user(db, data.assignee_id, "指派人")
+        await _validate_bug_assignee(db, data.assignee_id, project)
     bug.assignee_id = data.assignee_id
     bug.updated_by = current_user.id
     _record_bug_transition(db, bug, action="assign", from_status=bug.status, to_status=bug.status, remark=data.remark or "指派", user_id=current_user.id)

@@ -280,6 +280,7 @@ async def get_pending_cleanup_data(
                 WHERE is_deleted = 1
                 AND deleted_at IS NOT NULL
                 AND deleted_at <= :cutoff_time
+                ORDER BY deleted_at ASC, id ASC
                 LIMIT 100
             """
             sample_result = await db.execute(text(sample_sql), {"cutoff_time": cutoff_time})
@@ -512,7 +513,8 @@ def topological_sort(tables: List[str], dependencies: Dict[str, List[str]]) -> L
 
 async def cleanup_soft_deleted_data(
     db: AsyncSession,
-    cutoff_time: datetime
+    cutoff_time: datetime,
+    table_names: List[str] | None = None,
 ) -> Dict[str, any]:
     """
     清理所有表的软删除数据
@@ -520,6 +522,7 @@ async def cleanup_soft_deleted_data(
     Args:
         db: 数据库会话
         cutoff_time: 截止时间，清理 deleted_at <= cutoff_time 的数据
+        table_names: 本次清理的表范围；为空时清理全部可清理表
         
     Returns:
         清理结果统计
@@ -528,10 +531,12 @@ async def cleanup_soft_deleted_data(
     db_name = settings.DATABASE_NAME
     
     # 只处理当前模型表，避免把历史遗留物理表带入清理范围。
+    selected_table_set = set(table_names) if table_names is not None else None
     tables = [
         table_name
         for table_name in get_model_cleanup_tables()
         if table_name not in PHYSICAL_CLEANUP_EXCLUDED_TABLES
+        and (selected_table_set is None or table_name in selected_table_set)
     ]
     
     if not tables:

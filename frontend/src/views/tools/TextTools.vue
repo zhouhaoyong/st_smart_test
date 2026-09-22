@@ -1,6 +1,9 @@
 <template>
   <div class="tool-page">
     <div class="page-header"><h2>{{ pageTitle }}</h2></div>
+    <p v-if="activeTab === 'translation'" class="translation-privacy-tip">
+      提示：翻译内容将发送至外部翻译服务，请勿输入密码、Token、API Key 等敏感信息。
+    </p>
     <el-card>
       <el-tabs v-model="activeTab" class="text-tabs">
         <el-tab-pane label="多语言翻译" name="translation">
@@ -418,6 +421,7 @@ const tdDiff = async () => {
 <style scoped>
 .page-header { margin-bottom: 20px; }
 .page-header h2 { margin: 0; font-size: 22px; }
+.translation-privacy-tip { margin: -8px 0 16px; color: #8c6d1f; font-size: 13px; line-height: 20px; }
 .panel-label { font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #595959; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .text-tabs :deep(.el-tabs__header) { display: none; }

@@ -39,12 +39,15 @@ export function previewTableData(tableName, mode = 'datetime', cutoff = null, da
 }
 
 // 清理所有表的数据
-export function cleanupData(mode = 'datetime', cutoff = null, days = 7) {
+export function cleanupData(mode = 'datetime', cutoff = null, days = 7, tableNames = []) {
   const params = { mode }
   if (mode === 'datetime' && cutoff) {
     params.cutoff = cutoff
   } else if (mode === 'days') {
     params.days = days
+  }
+  if (tableNames.length) {
+    params.table_names = tableNames.join(',')
   }
   return request({ 
     url: '/cleanup/cleanup', 

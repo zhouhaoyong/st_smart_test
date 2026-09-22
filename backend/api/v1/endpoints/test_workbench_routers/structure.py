@@ -5,7 +5,7 @@ import re
 from copy import deepcopy
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.permissions import is_super_admin
@@ -281,11 +281,15 @@ async def list_workbench_project_users(
     db: AsyncSession = Depends(get_db),
 ):
     """返回当前项目可见范围内的 Bug 指派候选人，不复用用户管理接口。"""
-    await get_project(db, project_id, current_user)
+    project = await get_project(db, project_id, current_user)
+    query = select(User.id, User.real_name, User.nick_name).where(
+        User.is_deleted == False,
+        User.is_active == True,
+    )
+    if not project.is_public:
+        query = query.where(or_(User.id == project.created_by, User.is_superuser == True))
     rows = (await db.execute(
-        select(User.id, User.real_name, User.nick_name)
-        .where(User.is_deleted == False, User.is_active == True)
-        .order_by(User.real_name.asc(), User.id.asc())
+        query.order_by(User.real_name.asc(), User.id.asc())
     )).all()
     return success_response([
         {"id": user_id, "real_name": real_name, "nick_name": nick_name}
